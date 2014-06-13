@@ -30,7 +30,14 @@ namespace hpp {
     /// Set of nodes reachable from one another.
     class HPP_CORE_DLLAPI ConnectedComponent {
     public:
+      // List of nodes within the connected component
       typedef std::list <NodePtr_t> Nodes_t;
+      // List of connected components that can be reached from this connected
+      // component
+      ConnectedComponents_t reachableTo;
+      // List of connected components from which this connected component can
+      // be reached
+      ConnectedComponents_t reachableFrom;
       static ConnectedComponentPtr_t create ()
       {
 	ConnectedComponent* ptr = new ConnectedComponent ();
