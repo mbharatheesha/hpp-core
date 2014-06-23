@@ -34,10 +34,10 @@ namespace hpp {
       typedef std::list <NodePtr_t> Nodes_t;
       // List of connected components that can be reached from this connected
       // component
-      ConnectedComponents_t reachableTo;
+      ConnectedComponents_t reachableTo_;
       // List of connected components from which this connected component can
       // be reached
-      ConnectedComponents_t reachableFrom;
+      ConnectedComponents_t reachableFrom_;
       static ConnectedComponentPtr_t create ()
       {
 	ConnectedComponent* ptr = new ConnectedComponent ();

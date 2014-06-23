@@ -73,6 +73,16 @@ namespace hpp {
       /// as goal node. Otherwise create a new node.
       void addGoalNode (const ConfigurationPtr_t& config);
 
+      /// Check and update reachability between two connected components
+      /// \param connectedComponent1: the first connected component 
+      /// \param connectedComponent2: the second connected component 
+      /// If both connected components are reachable to each other,
+      /// they are merged. Else, their respective reachability lists
+      /// are updated
+      void updateCCReachability(const ConnectedComponentPtr_t&
+              connectedComponent1, const ConnectedComponentPtr_t&
+              connectedComponent2);
+
       void resetGoalNodes ()
       {
 	goalNodes_.clear ();

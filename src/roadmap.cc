@@ -129,7 +129,7 @@ namespace hpp {
 				       const ConfigurationPtr_t& to,
 				       const PathPtr_t path)
     {
-      interval_t timeRange = path->timeRange ();
+      //interval_t timeRange = path->timeRange ();
       NodePtr_t nodeTo = addNode (to, from->connectedComponent ());
       addEdge (from, nodeTo, path);
       addEdge (nodeTo, from, path->extract
@@ -195,20 +195,10 @@ namespace hpp {
       // If node connected components are different, merge them
       ConnectedComponentPtr_t cc1 = n1->connectedComponent ();
       ConnectedComponentPtr_t cc2 = n2->connectedComponent ();
+      
       if (cc1 != cc2) {
-	cc1->merge (cc2);
-	//nearestNeighbor_ [cc1]->merge (nearestNeighbor_ [cc2]);
-	kdTree_.merge(cc1, cc2);
-	// Remove cc2 from list of connected components
-	ConnectedComponents_t::iterator itcc =
-	  std::find (connectedComponents_.begin (), connectedComponents_.end (),
-		     cc2);
-	assert (itcc != connectedComponents_.end ());
-	connectedComponents_.erase (itcc);
-	// remove cc2 from map of nearest neighbors
-	//NearetNeighborMap_t::iterator itnear = nearestNeighbor_.find (cc2);
-	//assert (itnear != nearestNeighbor_.end ());
-	//nearestNeighbor_.erase (itnear);
+          //Check and update reachability of the connected components
+          updateCCReachability(cc1,cc2);
       }
       return edge;
     }
@@ -221,6 +211,47 @@ namespace hpp {
       node->connectedComponent ()->addNode (node);
       //nearestNeighbor_ [node->connectedComponent ()]->add (node);
       kdTree_.addNode(node);
+    }
+    void Roadmap::updateCCReachability(const ConnectedComponentPtr_t& cc1,
+            const ConnectedComponentPtr_t& cc2)
+    {
+        ConnectedComponents_t::iterator itcc1 = 
+            std::find (cc1->reachableTo_.begin(),cc1->reachableTo_.end(),
+                    cc2);
+        ConnectedComponents_t::iterator itcc2 = 
+            std::find (cc2->reachableTo_.begin(),cc2->reachableTo_.end(),
+                    cc1);
+        bool cc1Tocc2 = (itcc1 != cc1->reachableTo_.end())?
+            true:false;
+        bool cc2Tocc1 = (itcc2 != cc2->reachableTo_.end())?
+            true:false;
+        //If both components are reachable to each other, merge them
+        if (cc1Tocc2 && cc2Tocc1) {
+            cc1->merge (cc2);
+            //Merge the connected components in kdTree
+            kdTree_.merge(cc1, cc2);
+            // Remove cc2 from list of connected components
+            ConnectedComponents_t::iterator itcc =
+                std::find (connectedComponents_.begin (), connectedComponents_.end (),
+                        cc2);
+            assert (itcc != connectedComponents_.end ());
+            connectedComponents_.erase (itcc);
+        }
+        else {
+            ConnectedComponents_t::iterator itcc; 
+            if (cc1Tocc2) {
+                itcc = cc1->reachableTo_.end();
+                cc1->reachableTo_.splice (itcc, cc2->reachableTo_);
+                itcc = cc2->reachableFrom_.end();
+                cc2->reachableFrom_.splice (itcc, cc1->reachableFrom_);
+            }
+            if (cc2Tocc1) {
+                itcc = cc2->reachableTo_.end();
+                cc2->reachableTo_.splice (itcc, cc1->reachableTo_);
+                itcc = cc1->reachableFrom_.end();
+                cc1->reachableFrom_.splice (itcc, cc2->reachableFrom_);
+            }
+        }
     }
 
   } //   namespace core
