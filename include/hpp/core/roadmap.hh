@@ -19,6 +19,7 @@
 #ifndef HPP_CORE_ROADMAP_HH
 # define HPP_CORE_ROADMAP_HH
 
+# include <iostream>
 # include <hpp/core/fwd.hh>
 # include <hpp/core/config.hh>
 # include <hpp/core/k-d-tree.hh>
@@ -162,4 +163,5 @@ namespace hpp {
     }; // class Roadmap
   } //   namespace core
 } // namespace hpp
+std::ostream& operator<< (std::ostream& os, const hpp::core::Roadmap& r);
 #endif // HPP_CORE_ROADMAP_HH
