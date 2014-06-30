@@ -249,12 +249,20 @@ namespace hpp {
                 itcc = cc1->reachableFrom_.end();
                 cc1->reachableFrom_.splice (itcc, cc2->reachableFrom_);
             }
+            if (!cc1Tocc2 && !cc2Tocc1) {
+                //The lists are empty. Populate the list.
+                itcc = cc1->reachableTo_.end();
+                cc1->reachableTo_.insert (itcc, cc2);
+                itcc = cc2->reachableFrom_.end();
+                cc2->reachableFrom_.insert (itcc, cc1);
+            }
+
         }
     }
     bool Roadmap::pathExists () const
     {
       const ConnectedComponents_t reachableFromInit =
-	initNode ()->connectedComponent ()->reachableTo ();
+	initNode ()->connectedComponent ()->reachableTo_;
       for (Nodes_t::const_iterator itGoal = goalNodes ().begin ();
 	   itGoal != goalNodes ().end (); itGoal++) {
 	if (std::find (reachableFromInit.begin (), reachableFromInit.end (),
@@ -340,19 +348,20 @@ std::ostream& operator<< (std::ostream& os, const hpp::core::Roadmap& r)
     os << std::endl;
     os << "Reachable to :";
     for (ConnectedComponents_t::const_iterator itTo =
-	   cc->reachableTo ().begin (); itTo != cc->reachableTo ().end ();
+	   cc->reachableTo_.begin (); itTo != cc->reachableTo_.end ();
 	 ++itTo) {
       os << ccId [*itTo] << ", ";
     }
     os << std::endl;
     os << "Reachable from :";
     for (ConnectedComponents_t::const_iterator itFrom =
-	   cc->reachableFrom ().begin (); itFrom != cc->reachableFrom ().end ();
+	   cc->reachableFrom_.begin (); itFrom != cc->reachableFrom_.end ();
 	 ++itFrom) {
       os << ccId [*itFrom] << ", ";
     }
-    os << std::endl;
-  }
+        os << std::endl;
+        os << "----------------" << std::endl;
+      }
   return os;
 }
 
