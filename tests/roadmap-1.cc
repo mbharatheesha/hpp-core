@@ -83,7 +83,27 @@ BOOST_AUTO_TEST_CASE (Roadmap1) {
   NodePtr_t n_goal = r->addNode (q_goal);
   r->addGoalNode (q_goal);
 
+  ConfigurationPtr_t q_randnode (new Configuration_t (robot->configSize ()));
+  (*q_randnode)[0] = 0.5; (*q_randnode) [1] = 0.9;
+  NodePtr_t n_randnode = r->addNode (q_randnode);
+
+  ConfigurationPtr_t q_randnode1 (new Configuration_t (robot->configSize ()));
+  (*q_randnode1)[0] = -0.1; (*q_randnode1) [1] = -0.9;
+  NodePtr_t n_randnode1 = r->addNode (q_randnode1);
+
+  ConfigurationPtr_t q_randnode2 (new Configuration_t (robot->configSize ()));
+  (*q_randnode2)[0] = 1.5; (*q_randnode2) [1] = 2.9;
+  NodePtr_t n_randnode2 = r->addNode (q_randnode2);
+
+
+
   r->addEdge (n_init, n_goal, sm (*q_init, *q_goal));
+  r->addEdge (n_init, n_randnode, sm (*q_init, *q_randnode));
+  r->addEdge (n_randnode, n_init, sm (*q_randnode, *q_init));
+  r->addEdge (n_randnode, n_randnode1, sm (*q_randnode, *q_randnode1));
+  r->addEdge (n_randnode1, n_randnode2, sm (*q_randnode1, *q_randnode2));
+  r->addEdge (n_goal, n_randnode1, sm (*q_goal, *q_randnode1));
+  r->addEdge (n_randnode2, n_goal, sm (*q_randnode2, *q_goal));
 
   std::cout << *r << std::endl;
   BOOST_CHECK (r->pathExists ());

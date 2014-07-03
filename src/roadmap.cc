@@ -213,50 +213,46 @@ namespace hpp {
     void Roadmap::updateCCReachability(const ConnectedComponentPtr_t& cc1,
             const ConnectedComponentPtr_t& cc2)
     {
-        ConnectedComponents_t::iterator itcc1 = 
-            std::find (cc1->reachableTo_.begin(),cc1->reachableTo_.end(),
-                    cc2);
+        //Update the respective reachability lists of the connected components
+        //CC Iterator for connectivity update 
+        ConnectedComponents_t::iterator itcc;
+
+        itcc = cc1->reachableTo_.end ();
+        cc1->reachableTo_.insert (itcc, cc2);
+        itcc = cc2->reachableFrom_.end ();
+        cc2->reachableFrom_.insert (itcc, cc1);
+
+        //Check Existence of reverse connectivity
         ConnectedComponents_t::iterator itcc2 = 
-            std::find (cc2->reachableTo_.begin(),cc2->reachableTo_.end(),
+            std::find (cc2->reachableTo_.begin(), cc2->reachableTo_.end(),
                     cc1);
-        bool cc1Tocc2 = (itcc1 != cc1->reachableTo_.end())?
-            true:false;
+        //Check for existence of reverse connectivity     
         bool cc2Tocc1 = (itcc2 != cc2->reachableTo_.end())?
             true:false;
         //If both components are reachable to each other, merge them
-        if (cc1Tocc2 && cc2Tocc1) {
+        if (cc2Tocc1) {
+            //Delete the CC copy to avoid double indexing
+            cc1->reachableTo_.remove (cc2);
             cc1->merge (cc2);
             //Merge the connected components in kdTree
             kdTree_.merge(cc1, cc2);
-            // Remove cc2 from list of connected components
-            ConnectedComponents_t::iterator itcc =
-                std::find (connectedComponents_.begin (), connectedComponents_.end (),
-                        cc2);
-            assert (itcc != connectedComponents_.end ());
-            connectedComponents_.erase (itcc);
-        }
-        else {
-            ConnectedComponents_t::iterator itcc; 
-            if (cc1Tocc2) {
-                itcc = cc1->reachableTo_.end();
-                cc1->reachableTo_.splice (itcc, cc2->reachableTo_);
-                itcc = cc2->reachableFrom_.end();
-                cc2->reachableFrom_.splice (itcc, cc1->reachableFrom_);
-            }
-            if (cc2Tocc1) {
-                itcc = cc2->reachableTo_.end();
-                cc2->reachableTo_.splice (itcc, cc1->reachableTo_);
-                itcc = cc1->reachableFrom_.end();
-                cc1->reachableFrom_.splice (itcc, cc2->reachableFrom_);
-            }
-            if (!cc1Tocc2 && !cc2Tocc1) {
-                //The lists are empty. Populate the list.
-                itcc = cc1->reachableTo_.end();
-                cc1->reachableTo_.insert (itcc, cc2);
-                itcc = cc2->reachableFrom_.end();
-                cc2->reachableFrom_.insert (itcc, cc1);
+            //All CCs in the reachableTo list of cc2 will now go to cc1
+            itcc = cc1->reachableTo_.end();
+            cc1->reachableTo_.splice (itcc, cc2->reachableTo_);
+           
+
+            //All CCs which have cc2 in their reachableFrom list, will change to cc1
+            for (itcc = connectedComponents_.begin ();itcc != connectedComponents_.end (); 
+                    itcc++) {
+                std::replace((*itcc)->reachableFrom_.begin (), 
+                        (*itcc)->reachableFrom_.end (), cc2, cc1);
             }
 
+            // Remove cc2 from list of connected components
+            itcc = std::find (connectedComponents_.begin (), connectedComponents_.end (),
+                    cc2);
+            assert (itcc != connectedComponents_.end ());
+            connectedComponents_.erase (itcc);
         }
     }
     bool Roadmap::pathExists () const
