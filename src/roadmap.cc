@@ -196,7 +196,9 @@ namespace hpp {
       
       if (cc1 != cc2) {
           //Check and update reachability of the connected components
-          updateCCReachability(cc1,cc2);
+          updateCCReachability (cc1, cc2);
+          //Find Strongly Connected Components (SCC)using Tarjan's algorithm
+          //findSCC (connectedComponents_); 
       }
       return edge;
     }
@@ -210,7 +212,7 @@ namespace hpp {
       //nearestNeighbor_ [node->connectedComponent ()]->add (node);
       kdTree_.addNode(node);
     }
-    void Roadmap::updateCCReachability(const ConnectedComponentPtr_t& cc1,
+    void Roadmap::updateCCReachability (const ConnectedComponentPtr_t& cc1,
             const ConnectedComponentPtr_t& cc2)
     {
         //Update the respective reachability lists of the connected components
@@ -224,7 +226,12 @@ namespace hpp {
         //cc1 is now also reachable to the CCs which cc2 can reach
         cc1->reachableTo_.insert (itcc, cc2->reachableTo_.begin (), cc2->reachableTo_.end ());
         cc1->reachableTo_.sort ();cc1->reachableTo_.unique ();
-
+//        itcc = std::find (cc1->reachableTo_.begin (),cc1->reachableTo_.end (),
+//                cc1);
+//        if(itcc != cc1->reachableTo_. end()) {
+//            cc1->reachableTo_.erase(itcc);
+//        }
+//
 
         //Similarly, cc2 will also be reachable from all CCs that reach cc1
         itcc = cc2->reachableFrom_.end ();
@@ -232,39 +239,97 @@ namespace hpp {
         itcc++;
         cc2->reachableFrom_.insert (itcc, cc1->reachableFrom_.begin (), cc1->reachableFrom_.end ());
         cc2->reachableFrom_.sort ();cc2->reachableFrom_.unique ();
-
-        //Check Existence of loops in the roadmap and merge loops into one CC
-        ConnectedComponents_t::iterator itcc2;
-        itcc2 = std::find (cc2->reachableTo_.begin (), cc2->reachableTo_.end (), cc1);
-
-        bool cc2Tocc1 = (itcc2 != cc2->reachableTo_.end ()) ?
-            true : false;
-
-        if (cc2Tocc1) {
-            //Delete the CC copy to avoid double indexing
-            //cc1->reachableTo_.remove (cc2);
-            cc1->merge (cc2);
-            //Merge the connected components in kdTree
-            kdTree_.merge(cc1, cc2);
-            //All CCs in the reachableTo list of cc2 will now go to cc1
-            itcc = cc1->reachableTo_.end();
-            cc1->reachableTo_.splice (itcc, cc2->reachableTo_);
-            //All CCs which have cc2 in their reachableFrom list, will change to cc1
-            for (itcc = connectedComponents_.begin ();itcc != connectedComponents_.end (); 
-                    itcc++) {
-                std::replace((*itcc)->reachableFrom_.begin (), 
-                        (*itcc)->reachableFrom_.end (), cc2, cc1);
+//         itcc = std::find (cc2->reachableFrom_.begin (),cc2->reachableFrom_.end (),
+//                cc2);
+//        if(itcc != cc2->reachableFrom_. end()) {
+//            cc2->reachableFrom_.erase(itcc);
+//        }
+//
+       
+    }
+    void Roadmap::findSCC (const RoadmapPtr_t& roadMap)
+    {
+        ConnectedComponents_t::iterator itcc; 
+        
+        //Search for loops in a reverse manner using DFS
+        for (itcc = roadMap->connectedComponents_.begin ();
+                itcc != roadMap->connectedComponents_.end ();
+                itcc++) {
+            if (!((*itcc)->isExplored ())) {
+                roadMap->setSCCHead (*itcc);
+                (*itcc)->setLeader (*itcc);
+               roadMap->DFSRev (roadMap, *itcc);
             }
-            // Remove cc2 from list of connected components
-            ConnectedComponents_t::iterator itcc =
-                std::find (connectedComponents_.begin (), connectedComponents_.end (),
-                        cc2);
-            itcc = std::find (connectedComponents_.begin (), connectedComponents_.end (),
-                    cc2);
-            assert (itcc != connectedComponents_.end ());
-            connectedComponents_.erase (itcc);
+        }
+        //Sort the connected components in decreasing order
+        //of finish time
+        connectedComponents_.sort
+            (ConnectedComponent::compareCCFinishTime());
+        //Clear the leader list for the new DFS
+        sccHeadsList_.clear ();
+        //Reset explored status of all CCs
+        for (itcc = roadMap->connectedComponents_.begin ();
+                 itcc != roadMap->connectedComponents_.end ();
+                itcc++) {
+            (*itcc)->resetExplored ();
+        }
+        //Search for loops in a reverse manner using DFS
+        for (itcc = roadMap->connectedComponents_.begin ();
+                itcc != roadMap->connectedComponents_.end ();
+                itcc++) {
+            if (!((*itcc)->isExplored ())) {
+                roadMap->setSCCHead (*itcc);
+                (*itcc)->setLeader (*itcc);
+                roadMap->DFS (roadMap, *itcc);
+            }
+        }
+ 
+    }
+    int ConnectedComponent::globalFinishTime_=0;
+
+    void Roadmap::setSCCHead
+        (const ConnectedComponentPtr_t& headCC)
+    {
+        sccHeadsList_.push_back (headCC);
+    }
+
+    void Roadmap::DFSRev
+        (const RoadmapPtr_t& rMap, const ConnectedComponentPtr_t& cc)
+    {
+        //Do the DFS here
+        ConnectedComponents_t::iterator itcc_dfs;
+        cc->setExplored ();
+       
+        for (itcc_dfs = cc->reachableFrom_.begin (); itcc_dfs != cc->reachableFrom_.end ();
+                itcc_dfs++) {
+          if (!((*itcc_dfs)->isExplored ())) {
+             (*itcc_dfs)->setLeader (cc);
+            rMap->DFSRev (rMap, (*itcc_dfs));
+           }
+            cc->incrementFinishTime ();
+            cc->setFinishTime();
         }
     }
+
+    void Roadmap::DFS
+        (const RoadmapPtr_t& rMap, const ConnectedComponentPtr_t& cc)
+    {
+        //Do the DFS here
+        ConnectedComponents_t::iterator itcc_dfs;
+        cc->setExplored ();
+       // cc->setLeader (cc);
+       for (itcc_dfs = cc->reachableTo_.begin (); itcc_dfs != cc->reachableTo_.end ();
+                itcc_dfs++) {
+        if (!((*itcc_dfs)->isExplored ())) {
+            (*itcc_dfs)->setLeader (cc);
+           rMap->DFS (rMap, (*itcc_dfs));
+           }
+            cc->incrementFinishTime ();
+            cc->setFinishTime();
+        }
+    }
+
+
     bool Roadmap::pathExists () const
     {
       const ConnectedComponents_t reachableFromInit =
@@ -295,6 +360,7 @@ std::ostream& operator<< (std::ostream& os, const hpp::core::Roadmap& r)
   // Enumerate nodes and connected components
   std::map <NodePtr_t, size_type> nodeId;
   std::map <ConnectedComponentPtr_t, size_type> ccId;
+  std::map <ConnectedComponentPtr_t, size_type> sccId;
 
   size_type count = 0;
   for (Nodes_t::const_iterator it = r.nodes ().begin ();
@@ -308,6 +374,15 @@ std::ostream& operator<< (std::ostream& os, const hpp::core::Roadmap& r)
        it != r.connectedComponents ().end (); ++it) {
     ccId [*it] = count; ++count;
   }
+
+  count = 0;
+  for (ConnectedComponents_t::const_iterator it =
+	 r.sccHeads ().begin ();
+       it != r.sccHeads ().end (); ++it) {
+    sccId [*it] = count; ++count;
+  }
+
+
 
   // Display list of nodes
   os << "----------------------------------------------------------------------"
@@ -365,9 +440,17 @@ std::ostream& operator<< (std::ostream& os, const hpp::core::Roadmap& r)
 	 ++itFrom) {
       os << ccId [*itFrom] << ", ";
     }
+      os << std::endl << "Leader:" << ccId [(*it)->getLeader ()] <<
+          std::endl << std::endl;
+    }
         os << std::endl;
         os << "----------------" << std::endl;
-      }
+      
+  for (ConnectedComponents_t::const_iterator itscc = r.sccHeads ().begin ();
+          itscc != r.sccHeads ().end (); ++itscc) {
+      const ConnectedComponentPtr_t cc = *itscc;
+      os << "SCC_Head:" << sccId [cc] << std::endl;
+  }
   return os;
 }
 

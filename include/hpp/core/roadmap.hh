@@ -80,9 +80,22 @@ namespace hpp {
       /// If both connected components are reachable to each other,
       /// they are merged. Else, their respective reachability lists
       /// are updated
-      void updateCCReachability(const ConnectedComponentPtr_t&
+      void updateCCReachability (const ConnectedComponentPtr_t&
               connectedComponent1, const ConnectedComponentPtr_t&
               connectedComponent2);
+
+      /// Find Strongly Connected Components (SCC) in roadmap
+      /// \param roadMap: entire roadmap for finding SCC
+      void findSCC (const RoadmapPtr_t& roadMap);
+
+      void setSCCHead (const ConnectedComponentPtr_t& headCC);
+
+      void DFSRev (const RoadmapPtr_t& rMap,
+              const ConnectedComponentPtr_t& cc);
+
+      void DFS (const RoadmapPtr_t& rMap,
+              const ConnectedComponentPtr_t& cc);
+
 
       void resetGoalNodes ()
       {
@@ -108,6 +121,10 @@ namespace hpp {
       const ConnectedComponents_t& connectedComponents () const
       {
 	return connectedComponents_;
+      }
+      const ConnectedComponents_t& sccHeads () const
+      {
+	return sccHeadsList_;
       }
       NodePtr_t initNode () const
       {
@@ -156,6 +173,8 @@ namespace hpp {
       Edges_t edges_;
       NodePtr_t initNode_;
       Nodes_t goalNodes_;
+      ConnectedComponents_t sccHeadsList_;
+
       // use KDTree instead of NearestNeighbor 
       //NearetNeighborMap_t nearestNeighbor_;
       KDTree kdTree_;

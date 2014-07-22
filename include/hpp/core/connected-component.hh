@@ -36,6 +36,7 @@ namespace hpp {
       ConnectedComponents_t reachableTo_;
       // List of CCs from which this connected component can be reached
       ConnectedComponents_t reachableFrom_;
+      static int globalFinishTime_;
       static ConnectedComponentPtr_t create ()
       {
 	ConnectedComponent* ptr = new ConnectedComponent ();
@@ -67,9 +68,49 @@ namespace hpp {
       {
 	return nodes_;
       }
+      void setExplored ()
+      {
+          explored_ = true;
+      }
+      void resetExplored ()
+      {
+          explored_ = false;
+      }
+      void setLeader (const ConnectedComponentPtr_t& cc)
+      {
+          leaderCC_ = cc;
+      }
+      ConnectedComponentPtr_t getLeader ()
+      {
+          return leaderCC_;
+      }
+      void incrementFinishTime ()
+      {
+          globalFinishTime_++;
+      }
+      void setFinishTime ()
+      {
+          finishTimeCC_ = globalFinishTime_;
+      }
+      int getFinishTime ()
+      {
+          return finishTimeCC_;
+      }
+      bool isExplored ()
+      {
+          return explored_;
+      }
+      struct compareCCFinishTime {
+          bool operator () (const ConnectedComponentPtr_t& cc1,
+                  const ConnectedComponentPtr_t& cc2) const 
+          { return cc1->getFinishTime () > cc2->getFinishTime (); }
+      };
+
+
     protected:
       /// Constructor
-      ConnectedComponent () : nodes_ (), weak_ ()
+      ConnectedComponent () : nodes_ (), weak_ (),
+      finishTimeCC_ (0), explored_ (false)
       {
       }
       void init (const ConnectedComponentPtr_t& shPtr){
@@ -78,6 +119,10 @@ namespace hpp {
     private:
        Nodes_t nodes_;
        ConnectedComponentWkPtr_t weak_;
+       int finishTimeCC_;
+       bool explored_;
+       ConnectedComponentPtr_t leaderCC_;
+
     }; // class ConnectedComponent
   } //   namespace core
 } // namespace hpp

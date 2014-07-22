@@ -99,11 +99,14 @@ BOOST_AUTO_TEST_CASE (Roadmap1) {
 
   r->addEdge (n_init, n_goal, sm (*q_init, *q_goal));
   r->addEdge (n_init, n_randnode, sm (*q_init, *q_randnode));
-  r->addEdge (n_randnode, n_init, sm (*q_randnode, *q_init));
+  r->addEdge (n_goal, n_init, sm (*q_goal, *q_init));
   r->addEdge (n_randnode, n_randnode1, sm (*q_randnode, *q_randnode1));
   r->addEdge (n_randnode1, n_randnode2, sm (*q_randnode1, *q_randnode2));
   r->addEdge (n_goal, n_randnode1, sm (*q_goal, *q_randnode1));
-  r->addEdge (n_randnode2, n_goal, sm (*q_randnode2, *q_goal));
+  r->addEdge (n_randnode2, n_randnode, sm (*q_randnode2, *q_randnode));
+  r->addEdge (n_randnode1, n_goal, sm (*q_randnode1, *q_goal));
+
+  r->findSCC (r);
 
   std::cout << *r << std::endl;
   BOOST_CHECK (r->pathExists ());
