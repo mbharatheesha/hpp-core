@@ -56,6 +56,12 @@ namespace hpp {
 	}
 
 	nodes_.splice (nodes_.end (), other->nodes_);
+    reachableTo_.splice (reachableTo_.end (),
+            other->reachableTo_);
+    reachableFrom_.splice (reachableFrom_.end(),
+            other->reachableFrom_);
+    reachableTo_.sort (); reachableTo_.unique ();
+    reachableFrom_.sort (); reachableFrom_.unique ();
       }
       /// Add node in connected component
       /// \param node node to add.
@@ -105,6 +111,11 @@ namespace hpp {
                   const ConnectedComponentPtr_t& cc2) const 
           { return cc1->getFinishTime () > cc2->getFinishTime (); }
       };
+      struct emptyCC {
+          bool operator () (const ConnectedComponentPtr_t& cc1) const 
+          { return cc1->nodes ().empty (); }
+      };
+
 
 
     protected:

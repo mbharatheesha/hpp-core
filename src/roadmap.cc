@@ -221,10 +221,10 @@ namespace hpp {
 
         itcc = cc1->reachableTo_.end ();
         itcc = cc1->reachableTo_.insert (itcc, cc2);
-        //Increment iterator to reach the end of reachability list
-        itcc++;
-        //cc1 is now also reachable to the CCs which cc2 can reach
-        cc1->reachableTo_.insert (itcc, cc2->reachableTo_.begin (), cc2->reachableTo_.end ());
+//        //Increment iterator to reach the end of reachability list
+//        itcc++;
+//        //cc1 is now also reachable to the CCs which cc2 can reach
+//        cc1->reachableTo_.insert (itcc, cc2->reachableTo_.begin (), cc2->reachableTo_.end ());
         cc1->reachableTo_.sort ();cc1->reachableTo_.unique ();
 //        itcc = std::find (cc1->reachableTo_.begin (),cc1->reachableTo_.end (),
 //                cc1);
@@ -236,8 +236,8 @@ namespace hpp {
         //Similarly, cc2 will also be reachable from all CCs that reach cc1
         itcc = cc2->reachableFrom_.end ();
         itcc = cc2->reachableFrom_.insert (itcc, cc1);
-        itcc++;
-        cc2->reachableFrom_.insert (itcc, cc1->reachableFrom_.begin (), cc1->reachableFrom_.end ());
+//        itcc++;
+//        cc2->reachableFrom_.insert (itcc, cc1->reachableFrom_.begin (), cc1->reachableFrom_.end ());
         cc2->reachableFrom_.sort ();cc2->reachableFrom_.unique ();
 //         itcc = std::find (cc2->reachableFrom_.begin (),cc2->reachableFrom_.end (),
 //                cc2);
@@ -250,16 +250,21 @@ namespace hpp {
     void Roadmap::findSCC (const RoadmapPtr_t& roadMap)
     {
         ConnectedComponents_t::iterator itcc; 
-        
+        ConnectedComponents_t::iterator itSCCHeads; 
+
+        itSCCHeads = sccHeadsList_.begin ();
         //Search for loops in a reverse manner using DFS
         for (itcc = roadMap->connectedComponents_.begin ();
                 itcc != roadMap->connectedComponents_.end ();
                 itcc++) {
             if (!((*itcc)->isExplored ())) {
                 roadMap->setSCCHead (*itcc);
-                (*itcc)->setLeader (*itcc);
-               roadMap->DFSRev (roadMap, *itcc);
+                roadMap->DFSRev (roadMap, *itcc);
             }
+//            else {
+//                std::advance(itSCCHeads,sccHeadsList_.size ());
+//                (*itcc)->setLeader(*itSCCHeads);
+//            }
         }
         //Sort the connected components in decreasing order
         //of finish time
@@ -269,21 +274,64 @@ namespace hpp {
         sccHeadsList_.clear ();
         //Reset explored status of all CCs
         for (itcc = roadMap->connectedComponents_.begin ();
-                 itcc != roadMap->connectedComponents_.end ();
+                itcc != roadMap->connectedComponents_.end ();
                 itcc++) {
             (*itcc)->resetExplored ();
         }
-        //Search for loops in a reverse manner using DFS
+
+        itSCCHeads = sccHeadsList_.begin ();
+        bool isAdvanced_;
+        //Search for loops in a forward manner using DFS
         for (itcc = roadMap->connectedComponents_.begin ();
                 itcc != roadMap->connectedComponents_.end ();
                 itcc++) {
             if (!((*itcc)->isExplored ())) {
                 roadMap->setSCCHead (*itcc);
-                (*itcc)->setLeader (*itcc);
-                roadMap->DFS (roadMap, *itcc);
+                 (*itcc)->setLeader(*itcc);
+                 isAdvanced_=false;
+               roadMap->DFS (roadMap, *itcc);
+            }
+            else {
+                if(!isAdvanced_) {
+                std::advance(itSCCHeads, 1);
+                isAdvanced_ = true;
+                }
+                (*itcc)->setLeader (*(itSCCHeads));
+                if ( itSCCHeads != sccHeadsList_.end () ) {
+                (*itSCCHeads)->merge (*itcc);
+                }
             }
         }
- 
+        for (itcc = roadMap->sccHeadsList_.begin ();
+                itcc != roadMap->sccHeadsList_.end ();
+                itcc++) {
+            for(ConnectedComponents_t::iterator itcc1 =
+                    (*itcc)->reachableTo_.begin ();
+                    itcc1 != (*itcc)->reachableTo_.end ();
+                    itcc1++) {
+                ConnectedComponents_t::iterator itLeader;
+                itLeader = std::find (roadMap->sccHeadsList_.begin (),
+                        roadMap->sccHeadsList_.end (),
+                        (*itcc1)->getLeader ());
+                *itcc1 = *itLeader;
+            }
+            (*itcc)->reachableTo_.sort ();
+            (*itcc)->reachableTo_.unique();
+             for(ConnectedComponents_t::iterator itcc1 =
+                    (*itcc)->reachableFrom_.begin ();
+                    itcc1 != (*itcc)->reachableFrom_.end ();
+                    itcc1++) {
+                ConnectedComponents_t::iterator itLeader;
+                itLeader = std::find (roadMap->sccHeadsList_.begin (),
+                        roadMap->sccHeadsList_.end (),
+                        (*itcc1)->getLeader ());
+                *itcc1 = *itLeader;
+            }
+            (*itcc)->reachableFrom_.sort ();
+            (*itcc)->reachableFrom_.unique();
+        }
+        roadMap->connectedComponents_.remove_if
+            (ConnectedComponent::emptyCC ());
     }
     int ConnectedComponent::globalFinishTime_=0;
 
@@ -296,16 +344,15 @@ namespace hpp {
     void Roadmap::DFSRev
         (const RoadmapPtr_t& rMap, const ConnectedComponentPtr_t& cc)
     {
-        //Do the DFS here
+        //Do the DFS on reverse graph here
         ConnectedComponents_t::iterator itcc_dfs;
         cc->setExplored ();
-       
+
         for (itcc_dfs = cc->reachableFrom_.begin (); itcc_dfs != cc->reachableFrom_.end ();
                 itcc_dfs++) {
-          if (!((*itcc_dfs)->isExplored ())) {
-             (*itcc_dfs)->setLeader (cc);
-            rMap->DFSRev (rMap, (*itcc_dfs));
-           }
+            if (!((*itcc_dfs)->isExplored ())) {
+                rMap->DFSRev (rMap, (*itcc_dfs));
+            }
             cc->incrementFinishTime ();
             cc->setFinishTime();
         }
@@ -314,16 +361,14 @@ namespace hpp {
     void Roadmap::DFS
         (const RoadmapPtr_t& rMap, const ConnectedComponentPtr_t& cc)
     {
-        //Do the DFS here
+        //Do the DFS on forward graph here
         ConnectedComponents_t::iterator itcc_dfs;
         cc->setExplored ();
-       // cc->setLeader (cc);
-       for (itcc_dfs = cc->reachableTo_.begin (); itcc_dfs != cc->reachableTo_.end ();
+        for (itcc_dfs = cc->reachableTo_.begin (); itcc_dfs != cc->reachableTo_.end ();
                 itcc_dfs++) {
-        if (!((*itcc_dfs)->isExplored ())) {
-            (*itcc_dfs)->setLeader (cc);
-           rMap->DFS (rMap, (*itcc_dfs));
-           }
+            if (!((*itcc_dfs)->isExplored ())) {
+                rMap->DFS (rMap, (*itcc_dfs));
+            }
             cc->incrementFinishTime ();
             cc->setFinishTime();
         }
@@ -332,17 +377,17 @@ namespace hpp {
 
     bool Roadmap::pathExists () const
     {
-      const ConnectedComponents_t reachableFromInit =
-	initNode ()->connectedComponent ()->reachableTo_;
-      for (Nodes_t::const_iterator itGoal = goalNodes ().begin ();
-	   itGoal != goalNodes ().end (); itGoal++) {
-	if (std::find (reachableFromInit.begin (), reachableFromInit.end (),
-		       (*itGoal)->connectedComponent ()) !=
-	    reachableFromInit.end ()) {
-	  return true;
-	}
-      }
-      return false;
+        const ConnectedComponents_t reachableFromInit =
+            initNode ()->connectedComponent ()->reachableTo_;
+        for (Nodes_t::const_iterator itGoal = goalNodes ().begin ();
+                itGoal != goalNodes ().end (); itGoal++) {
+            if (std::find (reachableFromInit.begin (), reachableFromInit.end (),
+                        (*itGoal)->connectedComponent ()) !=
+                    reachableFromInit.end ()) {
+                return true;
+            }
+        }
+        return false;
     }
   } //   namespace core
 } // namespace hpp
