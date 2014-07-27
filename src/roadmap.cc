@@ -27,369 +27,202 @@
 #include <hpp/core/k-d-tree.hh>
 
 namespace hpp {
-  namespace core {
+    namespace core {
 
-    std::string displayConfig (ConfigurationIn_t q)
-    {
-      std::ostringstream oss;
-      for (size_type i=0; i < q.size (); ++i) {
-	oss << q [i] << ",";
-      }
-      return oss.str ();
-    }
-
-    RoadmapPtr_t Roadmap::create (const DistancePtr_t& distance, const DevicePtr_t& robot)
-    {
-      Roadmap* ptr = new Roadmap (distance, robot);
-      return RoadmapPtr_t (ptr);
-    }
-
-    Roadmap::Roadmap (const DistancePtr_t& distance, const DevicePtr_t& robot) :
-      distance_ (distance), connectedComponents_ (), nodes_ (), edges_ (),
-      initNode_ (), goalNodes_ (),
-      //nearestNeighbor_ (),
-      kdTree_(robot, distance, 30)
-    {
-    }
-
-    Roadmap::~Roadmap ()
-    {
-      clear ();
-    }
-
-    void Roadmap::clear ()
-    {
-      connectedComponents_.clear ();
-
-      for (Nodes_t::iterator it = nodes_.begin (); it != nodes_.end (); it++) {
-	delete *it;
-      }
-      nodes_.clear ();
-
-      for (Edges_t::iterator it = edges_.begin (); it != edges_.end (); it++) {
-	delete *it;
-      }
-      edges_.clear ();
-
-      goalNodes_.clear ();
-      initNode_ = 0x0;
-      //nearestNeighbor_.clear ();
-      kdTree_.clear();
-    }
-
-    NodePtr_t Roadmap::addNode (const ConfigurationPtr_t& configuration)
-    {
-      value_type distance;
-      if (nodes_.size () != 0) {
-	NodePtr_t nearest = nearestNode (configuration, distance);
-	if (*(nearest->configuration ()) == *configuration) {
-	  return nearest;
-	}
-	if (distance < 1e-4) {
-	  throw std::runtime_error ("distance to nearest node too small");
-	}
-      }
-      NodePtr_t node = new Node (configuration);
-      hppDout (info, "Added node: " << displayConfig (*configuration));
-      nodes_.push_back (node);
-      // Node constructor creates a new connected component. This new
-      // connected component needs to be added in the roadmap and the
-      // new node needs to be registered in the connected component.
-      addConnectedComponent (node);
-      return node;
-    }
-
-    NodePtr_t Roadmap::addNode (const ConfigurationPtr_t& configuration,
-				ConnectedComponentPtr_t connectedComponent)
-    {
-      assert (connectedComponent);
-      value_type distance;
-      if (nodes_.size () != 0) {
-	NodePtr_t nearest = nearestNode (configuration, connectedComponent,
-					 distance);
-	if (*(nearest->configuration ()) == *configuration) {
-	  return nearest;
-	}
-	if (distance < 1e-4) {
-	  throw std::runtime_error ("distance to nearest node too small");
-	}
-      }
-      NodePtr_t node = new Node (configuration, connectedComponent);
-      hppDout (info, "Added node: " << displayConfig (*configuration));
-      nodes_.push_back (node);
-      // The new node needs to be registered in the connected
-      // component.
-      connectedComponent->addNode (node);
-	//nearestNeighbor_ [connectedComponent]->add (node);
-	kdTree_.addNode(node);
-      return node;
-    }
-
-    NodePtr_t Roadmap::addNodeAndEdge (const NodePtr_t from,
-				       const ConfigurationPtr_t& to,
-				       const PathPtr_t path)
-    {
-      NodePtr_t nodeTo = addNode (to, from->connectedComponent ());
-      addEdge (from, nodeTo, path);
-      addEdge (nodeTo, from, path->reverse ());
-      return nodeTo;
-    }
-
-    NodePtr_t
-    Roadmap::nearestNode (const ConfigurationPtr_t& configuration,
-			  value_type& minDistance)
-    {
-	NodePtr_t closest;
-	minDistance = std::numeric_limits<value_type>::infinity ();
-	for (ConnectedComponents_t::const_iterator itcc =
-	       connectedComponents_.begin ();
-	     itcc != connectedComponents_.end (); itcc++) {
-	  value_type distance;
-	  NodePtr_t node;
-	  //node = nearestNeighbor_ [*itcc]->nearest (configuration, distance);
-	  node = kdTree_.search(configuration, *itcc, distance);
-	  if (distance < minDistance) {
-	    minDistance = distance;
-	    closest = node;
-	  }
-
-	}
-      return closest;
-    }
-
-    NodePtr_t
-    Roadmap::nearestNode (const ConfigurationPtr_t& configuration,
-			  const ConnectedComponentPtr_t& connectedComponent,
-			  value_type& minDistance)
-    {
-      assert (connectedComponent);
-      //return nearestNeighbor_ [connectedComponent]->nearest (configuration,
-	//						     minDistance);
-      return kdTree_.search(configuration, connectedComponent, minDistance);
-    }
-
-    void Roadmap::addGoalNode (const ConfigurationPtr_t& config)
-    {
-      NodePtr_t node = addNode (config);
-      goalNodes_.push_back (node);
-    }
-
-    const DistancePtr_t& Roadmap::distance () const
-    {
-      return distance_;
-    }
-
-    EdgePtr_t Roadmap::addEdge (const NodePtr_t& n1, const NodePtr_t& n2,
-				const PathPtr_t& path)
-    {
-      EdgePtr_t edge = new Edge (n1, n2, path);
-      n1->addOutEdge (edge);
-      n2->addInEdge (edge);
-      edges_.push_back (edge);
-      hppDout (info, "Added edge between: " <<
-	       displayConfig (*(n1->configuration ())));
-      hppDout (info, "               and: " <<
-	       displayConfig (*(n2->configuration ())));
-      // If node connected components are different, merge them
-      ConnectedComponentPtr_t cc1 = n1->connectedComponent ();
-      ConnectedComponentPtr_t cc2 = n2->connectedComponent ();
-      
-      if (cc1 != cc2) {
-          //Check and update reachability of the connected components
-          updateCCReachability (cc1, cc2);
-          //Find Strongly Connected Components (SCC)using Tarjan's algorithm
-          //findSCC (connectedComponents_); 
-      }
-      return edge;
-    }
-
-    void Roadmap::addConnectedComponent (const NodePtr_t& node)
-    {
-      connectedComponents_.push_back (node->connectedComponent ());
-      //nearestNeighbor_ [node->connectedComponent ()] =
-	//NearestNeighborPtr_t (new NearestNeighbor (distance_));
-      node->connectedComponent ()->addNode (node);
-      //nearestNeighbor_ [node->connectedComponent ()]->add (node);
-      kdTree_.addNode(node);
-    }
-    void Roadmap::updateCCReachability (const ConnectedComponentPtr_t& cc1,
-            const ConnectedComponentPtr_t& cc2)
-    {
-        //Update the respective reachability lists of the connected components
-        //CC Iterator for connectivity update 
-        ConnectedComponents_t::iterator itcc;
-
-        itcc = cc1->reachableTo_.end ();
-        itcc = cc1->reachableTo_.insert (itcc, cc2);
-//        //Increment iterator to reach the end of reachability list
-//        itcc++;
-//        //cc1 is now also reachable to the CCs which cc2 can reach
-//        cc1->reachableTo_.insert (itcc, cc2->reachableTo_.begin (), cc2->reachableTo_.end ());
-        cc1->reachableTo_.sort ();cc1->reachableTo_.unique ();
-//        itcc = std::find (cc1->reachableTo_.begin (),cc1->reachableTo_.end (),
-//                cc1);
-//        if(itcc != cc1->reachableTo_. end()) {
-//            cc1->reachableTo_.erase(itcc);
-//        }
-//
-
-        //Similarly, cc2 will also be reachable from all CCs that reach cc1
-        itcc = cc2->reachableFrom_.end ();
-        itcc = cc2->reachableFrom_.insert (itcc, cc1);
-//        itcc++;
-//        cc2->reachableFrom_.insert (itcc, cc1->reachableFrom_.begin (), cc1->reachableFrom_.end ());
-        cc2->reachableFrom_.sort ();cc2->reachableFrom_.unique ();
-//         itcc = std::find (cc2->reachableFrom_.begin (),cc2->reachableFrom_.end (),
-//                cc2);
-//        if(itcc != cc2->reachableFrom_. end()) {
-//            cc2->reachableFrom_.erase(itcc);
-//        }
-//
-       
-    }
-    void Roadmap::findSCC (const RoadmapPtr_t& roadMap)
-    {
-        ConnectedComponents_t::iterator itcc; 
-        ConnectedComponents_t::iterator itSCCHeads; 
-
-        itSCCHeads = sccHeadsList_.begin ();
-        //Search for loops in a reverse manner using DFS
-        for (itcc = roadMap->connectedComponents_.begin ();
-                itcc != roadMap->connectedComponents_.end ();
-                itcc++) {
-            if (!((*itcc)->isExplored ())) {
-                roadMap->setSCCHead (*itcc);
-                roadMap->DFSRev (roadMap, *itcc);
+        std::string displayConfig (ConfigurationIn_t q)
+        {
+            std::ostringstream oss;
+            for (size_type i=0; i < q.size (); ++i) {
+                oss << q [i] << ",";
             }
-//            else {
-//                std::advance(itSCCHeads,sccHeadsList_.size ());
-//                (*itcc)->setLeader(*itSCCHeads);
-//            }
-        }
-        //Sort the connected components in decreasing order
-        //of finish time
-        connectedComponents_.sort
-            (ConnectedComponent::compareCCFinishTime());
-        //Clear the leader list for the new DFS
-        sccHeadsList_.clear ();
-        //Reset explored status of all CCs
-        for (itcc = roadMap->connectedComponents_.begin ();
-                itcc != roadMap->connectedComponents_.end ();
-                itcc++) {
-            (*itcc)->resetExplored ();
+            return oss.str ();
         }
 
-        itSCCHeads = sccHeadsList_.begin ();
-        bool isAdvanced_;
-        //Search for loops in a forward manner using DFS
-        for (itcc = roadMap->connectedComponents_.begin ();
-                itcc != roadMap->connectedComponents_.end ();
-                itcc++) {
-            if (!((*itcc)->isExplored ())) {
-                roadMap->setSCCHead (*itcc);
-                 (*itcc)->setLeader(*itcc);
-                 isAdvanced_=false;
-               roadMap->DFS (roadMap, *itcc);
+        RoadmapPtr_t Roadmap::create (const DistancePtr_t& distance, const DevicePtr_t& robot)
+        {
+            Roadmap* ptr = new Roadmap (distance, robot);
+            return RoadmapPtr_t (ptr);
+        }
+
+        Roadmap::Roadmap (const DistancePtr_t& distance, const DevicePtr_t& robot) :
+            distance_ (distance), nodes_ (), edges_ (), initNode_ (),goalNodes_ (),
+            ccGraph_ (CCGraph::create ()), kdTree_(robot, distance, 30)
+        {
+        }
+
+        Roadmap::~Roadmap ()
+        {
+            clear ();
+        }
+
+        void Roadmap::clear ()
+        {
+            ccGraph_->clear ();
+
+            for (Nodes_t::iterator it = nodes_.begin (); it != nodes_.end (); it++) {
+                delete *it;
             }
-            else {
-                if(!isAdvanced_) {
-                std::advance(itSCCHeads, 1);
-                isAdvanced_ = true;
+            nodes_.clear ();
+
+            for (Edges_t::iterator it = edges_.begin (); it != edges_.end (); it++) {
+                delete *it;
+            }
+            edges_.clear ();
+
+            goalNodes_.clear ();
+            initNode_ = 0x0;
+            //nearestNeighbor_.clear ();
+            kdTree_.clear();
+        }
+
+        NodePtr_t Roadmap::addNode (const ConfigurationPtr_t& configuration)
+        {
+            value_type distance;
+            if (nodes_.size () != 0) {
+                NodePtr_t nearest = nearestNode (configuration, distance);
+                if (*(nearest->configuration ()) == *configuration) {
+                    return nearest;
                 }
-                (*itcc)->setLeader (*(itSCCHeads));
-                if ( itSCCHeads != sccHeadsList_.end () ) {
-                (*itSCCHeads)->merge (*itcc);
+                if (distance < 1e-4) {
+                    throw std::runtime_error ("distance to nearest node too small");
                 }
             }
+            NodePtr_t node = new Node (configuration);
+            hppDout (info, "Added node: " << displayConfig (*configuration));
+            nodes_.push_back (node);
+            // Node constructor creates a new connected component. This new
+            // connected component needs to be added in the graph of connected and the
+            // components and new node needs to be registered in the connected component.
+            addConnectedComponent (node);
+            return node;
         }
-        for (itcc = roadMap->sccHeadsList_.begin ();
-                itcc != roadMap->sccHeadsList_.end ();
-                itcc++) {
-            for(ConnectedComponents_t::iterator itcc1 =
-                    (*itcc)->reachableTo_.begin ();
-                    itcc1 != (*itcc)->reachableTo_.end ();
-                    itcc1++) {
-                ConnectedComponents_t::iterator itLeader;
-                itLeader = std::find (roadMap->sccHeadsList_.begin (),
-                        roadMap->sccHeadsList_.end (),
-                        (*itcc1)->getLeader ());
-                *itcc1 = *itLeader;
+
+        NodePtr_t Roadmap::addNode (const ConfigurationPtr_t& configuration,
+                ConnectedComponentPtr_t connectedComponent)
+        {
+            assert (connectedComponent);
+            value_type distance;
+            if (nodes_.size () != 0) {
+                NodePtr_t nearest = nearestNode (configuration, connectedComponent,
+                        distance);
+                if (*(nearest->configuration ()) == *configuration) {
+                    return nearest;
+                }
+                if (distance < 1e-4) {
+                    throw std::runtime_error ("distance to nearest node too small");
+                }
             }
-            (*itcc)->reachableTo_.sort ();
-            (*itcc)->reachableTo_.unique();
-             for(ConnectedComponents_t::iterator itcc1 =
-                    (*itcc)->reachableFrom_.begin ();
-                    itcc1 != (*itcc)->reachableFrom_.end ();
-                    itcc1++) {
-                ConnectedComponents_t::iterator itLeader;
-                itLeader = std::find (roadMap->sccHeadsList_.begin (),
-                        roadMap->sccHeadsList_.end (),
-                        (*itcc1)->getLeader ());
-                *itcc1 = *itLeader;
-            }
-            (*itcc)->reachableFrom_.sort ();
-            (*itcc)->reachableFrom_.unique();
+            NodePtr_t node = new Node (configuration, connectedComponent);
+            hppDout (info, "Added node: " << displayConfig (*configuration));
+            nodes_.push_back (node);
+            // The new node needs to be registered in the connected
+            // component.
+            connectedComponent->addNode (node);
+            //nearestNeighbor_ [connectedComponent]->add (node);
+            kdTree_.addNode(node);
+            return node;
         }
-        roadMap->connectedComponents_.remove_if
-            (ConnectedComponent::emptyCC ());
-    }
-    int ConnectedComponent::globalFinishTime_=0;
 
-    void Roadmap::setSCCHead
-        (const ConnectedComponentPtr_t& headCC)
-    {
-        sccHeadsList_.push_back (headCC);
-    }
-
-    void Roadmap::DFSRev
-        (const RoadmapPtr_t& rMap, const ConnectedComponentPtr_t& cc)
-    {
-        //Do the DFS on reverse graph here
-        ConnectedComponents_t::iterator itcc_dfs;
-        cc->setExplored ();
-
-        for (itcc_dfs = cc->reachableFrom_.begin (); itcc_dfs != cc->reachableFrom_.end ();
-                itcc_dfs++) {
-            if (!((*itcc_dfs)->isExplored ())) {
-                rMap->DFSRev (rMap, (*itcc_dfs));
-            }
-            cc->incrementFinishTime ();
-            cc->setFinishTime();
+        NodePtr_t Roadmap::addNodeAndEdge (const NodePtr_t from,
+                const ConfigurationPtr_t& to,
+                const PathPtr_t path)
+        {
+            NodePtr_t nodeTo = addNode (to, from->connectedComponent ());
+            addEdge (from, nodeTo, path);
+            addEdge (nodeTo, from, path->reverse ());
+            return nodeTo;
         }
-    }
 
-    void Roadmap::DFS
-        (const RoadmapPtr_t& rMap, const ConnectedComponentPtr_t& cc)
-    {
-        //Do the DFS on forward graph here
-        ConnectedComponents_t::iterator itcc_dfs;
-        cc->setExplored ();
-        for (itcc_dfs = cc->reachableTo_.begin (); itcc_dfs != cc->reachableTo_.end ();
-                itcc_dfs++) {
-            if (!((*itcc_dfs)->isExplored ())) {
-                rMap->DFS (rMap, (*itcc_dfs));
+        NodePtr_t
+            Roadmap::nearestNode (const ConfigurationPtr_t& configuration,
+                    value_type& minDistance)
+            {
+                NodePtr_t closest;
+                minDistance = std::numeric_limits<value_type>::infinity ();
+                for (ConnectedComponents_t::const_iterator itcc =
+                        ccGraph_->connectedComponents ().begin ();
+                        itcc != ccGraph_->connectedComponents ().end (); itcc++) {
+                    value_type distance;
+                    NodePtr_t node;
+                    //node = nearestNeighbor_ [*itcc]->nearest (configuration, distance);
+                    node = kdTree_.search(configuration, *itcc, distance);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closest = node;
+                    }
+
+                }
+                return closest;
             }
-            cc->incrementFinishTime ();
-            cc->setFinishTime();
-        }
-    }
 
-
-    bool Roadmap::pathExists () const
-    {
-        const ConnectedComponents_t reachableFromInit =
-            initNode ()->connectedComponent ()->reachableTo_;
-        for (Nodes_t::const_iterator itGoal = goalNodes ().begin ();
-                itGoal != goalNodes ().end (); itGoal++) {
-            if (std::find (reachableFromInit.begin (), reachableFromInit.end (),
-                        (*itGoal)->connectedComponent ()) !=
-                    reachableFromInit.end ()) {
-                return true;
+        NodePtr_t
+            Roadmap::nearestNode (const ConfigurationPtr_t& configuration,
+                    const ConnectedComponentPtr_t& connectedComponent,
+                    value_type& minDistance)
+            {
+                assert (connectedComponent);
+                return kdTree_.search(configuration, connectedComponent, minDistance);
             }
+
+        void Roadmap::addGoalNode (const ConfigurationPtr_t& config)
+        {
+            NodePtr_t node = addNode (config);
+            goalNodes_.push_back (node);
         }
-        return false;
-    }
-  } //   namespace core
+
+        const DistancePtr_t& Roadmap::distance () const
+        {
+            return distance_;
+        }
+
+        EdgePtr_t Roadmap::addEdge (const NodePtr_t& n1, const NodePtr_t& n2,
+                const PathPtr_t& path)
+        {
+            EdgePtr_t edge = new Edge (n1, n2, path);
+            n1->addOutEdge (edge);
+            n2->addInEdge (edge);
+            edges_.push_back (edge);
+            hppDout (info, "Added edge between: " <<
+                    displayConfig (*(n1->configuration ())));
+            hppDout (info, "               and: " <<
+                    displayConfig (*(n2->configuration ())));
+            
+            ConnectedComponentPtr_t cc1 = n1->connectedComponent ();
+            ConnectedComponentPtr_t cc2 = n2->connectedComponent ();
+
+            //Check and update reachability of the connected components
+            ccGraph_->updateCCReachability (cc1, cc2);
+            //Find Strongly Connected Components (SCC) in CCGraph and merge them
+            ccGraph_->findSCC (); 
+
+            return edge;
+        }
+
+        void Roadmap::addConnectedComponent (const NodePtr_t& node)
+        {
+            //Add the node to the connected component
+            node->connectedComponent ()->addNode (node);
+            //Add connected component to the Graph of Connected Components
+            ccGraph_->addConnectedComponent (node->connectedComponent ());
+            kdTree_.addNode(node);
+        }
+
+
+        bool Roadmap::pathExists () const
+        {
+            const ConnectedComponents_t reachableFromInit =
+                initNode ()->connectedComponent ()->reachableTo_;
+            for (Nodes_t::const_iterator itGoal = goalNodes ().begin ();
+                    itGoal != goalNodes ().end (); itGoal++) {
+                if (std::find (reachableFromInit.begin (), reachableFromInit.end (),
+                            (*itGoal)->connectedComponent ()) !=
+                        reachableFromInit.end ()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    } //   namespace core
 } // namespace hpp
 
 std::ostream& operator<< (std::ostream& os, const hpp::core::Roadmap& r)
@@ -419,14 +252,6 @@ std::ostream& operator<< (std::ostream& os, const hpp::core::Roadmap& r)
        it != r.connectedComponents ().end (); ++it) {
     ccId [*it] = count; ++count;
   }
-
-  count = 0;
-  for (ConnectedComponents_t::const_iterator it =
-	 r.sccHeads ().begin ();
-       it != r.sccHeads ().end (); ++it) {
-    sccId [*it] = count; ++count;
-  }
-
 
 
   // Display list of nodes
@@ -462,8 +287,8 @@ std::ostream& operator<< (std::ostream& os, const hpp::core::Roadmap& r)
   os << "----------------------------------------------------------------------"
      << std::endl;
   for (ConnectedComponents_t::const_iterator it =
-	 r.connectedComponents ().begin ();
-       it != r.connectedComponents ().end (); ++it) {
+	 r.ccGraph ()->connectedComponents ().begin ();
+       it != r.ccGraph ()->connectedComponents ().end (); ++it) {
     const ConnectedComponentPtr_t cc = *it;
     os << "Connected component " << ccId [cc] << std::endl;
     os << "Nodes : ";
@@ -491,11 +316,6 @@ std::ostream& operator<< (std::ostream& os, const hpp::core::Roadmap& r)
         os << std::endl;
         os << "----------------" << std::endl;
       
-  for (ConnectedComponents_t::const_iterator itscc = r.sccHeads ().begin ();
-          itscc != r.sccHeads ().end (); ++itscc) {
-      const ConnectedComponentPtr_t cc = *itscc;
-      os << "SCC_Head:" << sccId [cc] << std::endl;
-  }
   return os;
 }
 
