@@ -75,6 +75,11 @@ SET(${PROJECT_NAME}_HEADERS
   include/hpp/core/straight-path.hh
   include/hpp/core/weighed-distance.hh
   include/hpp/core/k-d-tree.hh
+  include/hpp/core/system-dynamics.hh
+  include/hpp/core/integrate-dynamics.hh
+  include/hpp/core/simple-pendulum.hh
+  include/hpp/core/steering-statespace.hh
+  include/hpp/core/steering-ilqr.hh
   )
 
 ADD_REQUIRED_DEPENDENCY("hpp-util >= 3")

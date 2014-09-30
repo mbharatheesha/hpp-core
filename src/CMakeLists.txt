@@ -45,6 +45,8 @@ SET(${LIBRARY_NAME}_SOURCES
   k-d-tree.cc
   connected-component-graph.hh
   connected-component-graph.cc
+  simple-pendulum.cc
+  steering-ilqr.cc
   )
 
 ADD_LIBRARY(${LIBRARY_NAME}

@@ -33,6 +33,9 @@
 #include <hpp/core/steering-method-straight.hh>
 #include <hpp/core/weighed-distance.hh>
 
+#include <hpp/core/system-dynamics.hh>
+#include <hpp/core/simple-pendulum.hh>
+
 #define BOOST_TEST_MODULE roadmap-1
 #include <boost/test/included/unit_test.hpp>
 
@@ -47,6 +50,8 @@ using hpp::core::RoadmapPtr_t;
 using hpp::core::Roadmap;
 using hpp::core::NodePtr_t;
 using hpp::core::WeighedDistance;
+using hpp::core::SystemDynamics;
+using hpp::core::SimplePendulum;
 
 BOOST_AUTO_TEST_SUITE( test_hpp_core )
 
@@ -107,6 +112,36 @@ BOOST_AUTO_TEST_CASE (Roadmap1) {
   r->addEdge (n_randnode, n_goal, sm (*q_randnode, *q_goal));
 
   std::cout << *r << std::endl;
+
+  SimplePendulum pendulum;
+  
+  int numDOF = 1;
+  VectorXd initState;
+  VectorXd dState;
+  VectorXd tVec = VectorXd::LinSpaced (1000,0,5);
+  MatrixXd stateTraj;
+
+  pendulum.setProblemDimension (numDOF);
+
+  initState = 0*(VectorXd::Ones (2*numDOF));
+
+  initState(1) = 0.9;
+
+  pendulum.setParameters ();
+
+  stateTraj = MatrixXd::Zero (initState.size(),tVec.size());
+
+  stateTraj = pendulum.simulateDynamics (tVec, initState);
+
+  std::cout << "Dynamics of SimplePendulum were integrated successfully" << std::endl;
+
+  std::ofstream file_out;
+  file_out.open("test.dat");  
+
+  //std::cout << stateTraj;
+  file_out << stateTraj;
+  file_out.close();
+
   BOOST_CHECK (r->pathExists ());
 }
 BOOST_AUTO_TEST_SUITE_END()
