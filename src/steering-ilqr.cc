@@ -22,8 +22,12 @@
 namespace hpp {
     namespace core {
         /// Set the time discretization parameter
-        void SteeringILQR::setTimeDiscretization (double dt)
+        void SteeringILQR::setILQRParams (int nIter, int numCtl, int uLen, double dt)
         {
+            numIter_ = nIter;
+            numControl_ = numCtl;
+            controlLen_ = uLen;
+            linMatrices_.resize (uLen); 
             DT_ = dt;
         }
         /// Set the weighting matrices for computing cost
@@ -33,48 +37,166 @@ namespace hpp {
             Qstate_ = stateWeights.asDiagonal ();
             Qfinal_ = finalStateWeights.asDiagonal ();
             Rcontrol_ = controlWeights.asDiagonal ();
+            std::cout <<"It looks okay till here!"<<std::endl;
         }
 
         /// Cost Function
-        double SteeringILQR::computeCost (MatrixXd stateTraj, MatrixXd control)
+        double SteeringILQR::computeCost ()
         {
-            double costFinal = finalState_.transpose () * Qfinal_ * finalState_;
+            double costFinal = (stateTraj_->col (controlLen_-1) - finalState_).transpose () * Qfinal_
+                * (stateTraj_->col (controlLen_-1) - finalState_);
             double costTraj = 0;
+            std::cout << "state trajectory: " << stateTraj_->col (controlLen_-1) << std::endl;
 
-            for (int i=0; i < stateTraj.cols (); i++)
+            for (int i=0; i < stateTraj_->cols () - 1; i++)
             {
                 costTraj = costTraj + 
-                    (stateTraj.col (i).transpose () * Qstate_ * stateTraj.col (i)) +
-                    (control.col (i).transpose () * Rcontrol_ * control.col (i));
+                    (stateTraj_->col (i).transpose () * Qstate_ * stateTraj_->col (i)) +
+                    (controlSeq_->col (i).transpose () * Rcontrol_ * controlSeq_->col (i));
             }
 
+            std::cout <<"Cost computed successfully: "<< costTraj << std::endl;
             return (0.5 * (costTraj + costFinal));
         }
 
         /// Forward Pass
-        MatrixXd SteeringILQR::forwardPass (MatrixXd (*fdyn) (VectorXd, VectorXd))
+        void SteeringILQR::forwardPass (const MatrixPtr_t& ctl)
         {
-            return (*fdyn) (timeVec_, initState_);
+            VectorXd timeSeq (VectorXd::LinSpaced (controlLen_,0.0,controlLen_-1));
+            *stateTraj_ = sysDyn_->simulateDynamics (timeSeq, initState_, *ctl);
+            *dStateTraj_ = MatrixXd::Zero (2,100);
         }
 
-        void SteeringILQR::linearizeSystem (MatrixXd traj, MatrixXd control)
+        void SteeringILQR::linearizeSystem ()
         {
-            //Create an array of matrices to store the linearizations around
-            //the trajectory
-            MatrixXd *linMatrices = new MatrixXd [traj.cols ()];
-
-            for (int i = 0; i < traj.cols (); i++)
+            for (int i = 0; i < stateTraj_->cols () - 1; i++)
             {
-                MatrixXd &linMat = linMatrices [i];
-                linearizeFDJacobian (traj.col (i), control.col (i), linMat);
+                linearizeFDJacobian (stateTraj_->col (i), controlSeq_->col (i), linMatrices_.at (i));
             }
+            std::cout << "Linearizations finished successfully" << std::endl;
         }
 
         /// Forward Finite Difference Linearization
-        MatrixXd SteeringILQR::linearizeFDJacobian (VectorXd state, VectorXd control,
+        void SteeringILQR::linearizeFDJacobian (VectorXd state, VectorXd control,
                 MatrixXd& lMat)
         {
+            lMat.resize (state.rows (), state.rows () + control.rows ());
+            int idxState;
+            MatrixXd discreteIdentity (MatrixXd::Identity (state.rows (), state.rows ()));
+
+            for (idxState = 0; idxState < state.size (); idxState++)
+            {
+                VectorXd nomFnVal = sysDyn_-> computeStateDerivative (0.0, state, control);
+
+                VectorXd pertState = VectorXd::Zero (state.size ());
+
+                pertState (idxState) = HPP_CORE_FDSTEP_SIZE;
+
+
+                VectorXd pertFnVal = sysDyn_-> computeStateDerivative (0.0, state + pertState,
+                        control);
+
+                lMat.col (idxState) = discreteIdentity.col (idxState) +
+                    ((pertFnVal - nomFnVal) * HPP_CORE_FDSTEP_SIZE_INV * DT_);
+            }
+            for (int idxCtl = 0; idxCtl < control.size (); idxCtl++)
+            {
+                VectorXd nomFnVal = sysDyn_-> computeStateDerivative (0.0, state, control);
+
+                VectorXd pertControl = VectorXd::Zero (control.size ());
+
+                pertControl (idxCtl) = HPP_CORE_FDSTEP_SIZE;
+
+                VectorXd pertFnVal = sysDyn_-> computeStateDerivative (0.0, state,
+                        control + pertControl);
+
+                lMat.col (idxState + idxCtl) = (pertFnVal - nomFnVal) * HPP_CORE_FDSTEP_SIZE_INV
+                    * DT_;
+            }
         }
+
+        MatrixPtr_t SteeringILQR::deltaOptControl ()
+        {
+            MatrixXd Snext = Qfinal_;
+            MatrixXd valFun = MatrixXd::Zero (initState_.size (), controlLen_);
+
+            valFun.col (controlLen_-1) = Snext *
+                (stateTraj_->col (controlLen_-1) - finalState_);
+
+            VectorXd valNext = valFun.col (controlLen_-1);
+
+            MatrixXd K = MatrixXd::Zero (numControl_, initState_.size ());
+            MatrixXd Kv = MatrixXd::Zero (numControl_, initState_.size ());
+            MatrixXd Ku = MatrixXd::Zero (numControl_, numControl_);
+            MatrixXd Alin; 
+            MatrixXd Blin; 
+            for (int i = controlLen_-2; i > 0; i--)
+            {
+                Alin = (linMatrices_.at (i)).leftCols (initState_.size ());
+                Blin = (linMatrices_.at (i)).rightCols (numControl_);
+
+
+
+                K = ((Blin.transpose () * Snext * Blin) + Rcontrol_ ).inverse () *
+                    Blin.transpose () * Snext * Alin;
+
+
+                Kv = ((Blin.transpose () * Snext * Blin) + Rcontrol_ ).inverse () *
+                    Blin.transpose ();
+
+                Ku = ((Blin.transpose () * Snext * Blin) + Rcontrol_ ).inverse () *
+                    Rcontrol_;
+
+                MatrixXd Snew = Alin.transpose () * Snext * (Alin - (Blin * K)) + Qstate_;
+
+                valFun.col (i-1) = ((Alin - (Blin * K)).transpose () * valNext -
+                        (K.transpose () * Rcontrol_ * controlSeq_->col (i)) +
+                        (Qstate_ * stateTraj_->col (i)));
+
+                std::cout << "K: " << K << std::endl;
+                std::cout << "stateTraj: " << dStateTraj_->col (i) << std::endl;
+                std::cout << "Kv: " << Kv << std::endl;
+                std::cout << "valNext: " << valNext << std::endl;
+                std::cout << "Ku: " << Ku << std::endl;
+                std::cout << "controlseq: " << controlSeq_->col (i) << std::endl;
+                dControlSeq_->col (i) =- ((K * dStateTraj_->col (i)) + (Kv * valNext) +
+                        (Ku * controlSeq_->col (i)));
+                std::cout<< "Here is the issue with Matrix Multiplication" << std::endl;
+
+                valNext = valFun.col(i-1);
+                Snext = Snew;
+            }
+
+            return dControlSeq_;
+        }
+
+        MatrixPtr_t SteeringILQR::steerState (VectorXd init, VectorXd final)
+        {
+           initState_ = init;
+           finalState_ = final;
+           std::vector <double> costVec;
+
+           /// Do the forward pass with initial control input and compute the cost
+           forwardPass (controlSeq_);
+           double curCost = computeCost ();
+
+           /// Iteratively find the control improvement along the trajectory
+           for (int i=0; i < numIter_; i++)
+           {
+               /// Linearize the system around the forward pass trajectory
+               linearizeSystem ();
+
+               /// Compute the control improvement via backward pass
+               dControlSeq_ = deltaOptControl ();
+
+               *controlSeq_ = *controlSeq_ + (0.25 * (*dControlSeq_));
+               forwardPass (controlSeq_);
+               costVec.at (i) = computeCost ();
+
+               curCost = costVec.at (i);
+           }
+
+           return controlSeq_;
+        } 
     }
 }
-        

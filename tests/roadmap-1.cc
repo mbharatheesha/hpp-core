@@ -35,6 +35,8 @@
 
 #include <hpp/core/system-dynamics.hh>
 #include <hpp/core/simple-pendulum.hh>
+#include <hpp/core/steering-statespace.hh>
+#include <hpp/core/steering-ilqr.hh>
 
 #define BOOST_TEST_MODULE roadmap-1
 #include <boost/test/included/unit_test.hpp>
@@ -51,7 +53,11 @@ using hpp::core::Roadmap;
 using hpp::core::NodePtr_t;
 using hpp::core::WeighedDistance;
 using hpp::core::SystemDynamics;
+using hpp::core::SystemDynamicsPtr_t;
+using hpp::core::MatrixPtr_t;
 using hpp::core::SimplePendulum;
+using hpp::core::SteeringStateSpace;
+using hpp::core::SteeringILQR;
 
 BOOST_AUTO_TEST_SUITE( test_hpp_core )
 
@@ -113,7 +119,13 @@ BOOST_AUTO_TEST_CASE (Roadmap1) {
 
   std::cout << *r << std::endl;
 
+  SystemDynamics* ptr;
+  
   SimplePendulum pendulum;
+
+  ptr = &pendulum;
+
+  SystemDynamicsPtr_t shPtr (ptr);
   
   int numDOF = 1;
   VectorXd initState;
@@ -121,17 +133,17 @@ BOOST_AUTO_TEST_CASE (Roadmap1) {
   VectorXd tVec = VectorXd::LinSpaced (1000,0,5);
   MatrixXd stateTraj;
 
-  pendulum.setProblemDimension (numDOF);
+  shPtr->setProblemDimension (numDOF);
 
   initState = 0*(VectorXd::Ones (2*numDOF));
 
   initState(1) = 0.9;
 
-  pendulum.setParameters ();
+  static_cast<SimplePendulum*>(ptr)->setParameters ();
 
   stateTraj = MatrixXd::Zero (initState.size(),tVec.size());
 
-  stateTraj = pendulum.simulateDynamics (tVec, initState);
+  stateTraj = shPtr->simulateDynamics (tVec, initState);
 
   std::cout << "Dynamics of SimplePendulum were integrated successfully" << std::endl;
 
@@ -141,6 +153,38 @@ BOOST_AUTO_TEST_CASE (Roadmap1) {
   //std::cout << stateTraj;
   file_out << stateTraj;
   file_out.close();
+
+
+  /// Testing for the ILQR functionality
+  SteeringILQR iLQRsteer;
+
+  int ilqrIter = 20;
+  int numIn = 1;
+  int lenIn = 100;
+  double dt = 0.005;
+  MatrixPtr_t ilqrCtlSeq;
+
+  VectorXd stateWeight (numDOF*2);
+  VectorXd finalStateWeight (numDOF*2);
+  VectorXd controlWeight (numIn);
+
+  stateWeight.fill (0.0001);
+  finalStateWeight.fill (1);
+  controlWeight.fill (1);
+
+  iLQRsteer.setILQRParams (ilqrIter, numIn, lenIn, dt);
+  iLQRsteer.setWeightingMatrices (stateWeight, finalStateWeight, controlWeight);
+  iLQRsteer.setSysDynPtr (shPtr);
+  iLQRsteer.createStCtlShPtr ();
+
+  initState (0) = 0;
+  initState (1) = 0;
+
+  VectorXd finalState (numDOF*2);
+  finalState (0) = 3.1416;
+  finalState (1) = 0;
+
+  ilqrCtlSeq = iLQRsteer.steerState (initState, finalState);
 
   BOOST_CHECK (r->pathExists ());
 }

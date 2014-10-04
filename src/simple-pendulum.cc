@@ -37,17 +37,17 @@ namespace hpp {
             {
                 VectorXd stateDot (stateVector.size ());
 
-                dynamics_.resize (stateVector.size ());
+                dynAutonomous_.resize (stateVector.size ());
 
-                externalforce_.resize (stateVector.size ());
+                dynForced_.resize (stateVector.size ());
 
-                dynamics_ (0) = stateVector (1);
-                dynamics_ (1) = -(GRAVITY / length_) * sin (stateVector (0)) -
+                dynAutonomous_ (0) = stateVector (1);
+                dynAutonomous_ (1) = -(GRAVITY / length_) * sin (stateVector (0)) -
                     ((friction_ * stateVector (1))/(mass_ * length_*length_));
 
-                externalforce_ << 0,1;
+                dynForced_ << 0,1;
 
-                stateDot = dynamics_ + (externalforce_ * control);
+                stateDot = dynAutonomous_ + (dynForced_ * control);
 
                 return stateDot;
             }
@@ -62,14 +62,16 @@ namespace hpp {
             return control;
         }
 
-        MatrixXd SimplePendulum::simulateDynamics (VectorXd tVec, VectorXd initState)
+        /// Used for feedback control
+        MatrixXd SimplePendulum::simulateDynamics (VectorXd tVec,
+                VectorXd initState)
         {
             int trajLen = tVec.size();
             MatrixXd stateTraj;
             double stepSize;
 
             stateTraj.resize (initState.size (), trajLen);
-            
+
             stateTraj.col (0) = initState;
 
 
@@ -83,14 +85,37 @@ namespace hpp {
 
             return stateTraj;
         }
-        
+
+        /// Used for feedforward control
+        MatrixXd SimplePendulum::simulateDynamics (VectorXd tVec,
+                VectorXd initState, MatrixXd control)
+        {
+            int trajLen = tVec.size();
+            MatrixXd stateTraj;
+            double stepSize;
+
+            stateTraj.resize (initState.size (), trajLen);
+
+            stateTraj.col (0) = initState;
+
+
+            for (int i = 1; i < trajLen ; i++)
+            {
+                stepSize = tVec (i) - tVec (i-1);
+                VectorXd newState = integrateRK4 (tVec (i-1), stateTraj.col (i-1),
+                        control.col (i), stepSize);
+                stateTraj.col (i) = newState;
+            }
+
+            return stateTraj;
+        }
         VectorXd SimplePendulum::integrateRK4 (double t, VectorXd state, VectorXd u, double h)
         {
             VectorXd st1 = computeStateDerivative (t, state, u);
             VectorXd st2 = computeStateDerivative (t + (0.5 * h), state + (0.5 * h * st1), u);
             VectorXd st3 = computeStateDerivative (t + (0.5 * h), state + (0.5 * h * st2),  u);
             VectorXd st4 = computeStateDerivative (t + h, state + (h * st3), u);
-            
+
             return (state + ((1/6.0) * h * (st1 + 2.0*st2 + 2.0*st3 + st4)));
         }
 

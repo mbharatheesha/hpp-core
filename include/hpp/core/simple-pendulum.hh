@@ -44,6 +44,7 @@ namespace hpp {
                 VectorXd computeStateDerivative (double time, VectorXd stateVector, VectorXd control);
                 VectorXd getControl (VectorXd stateVector);
                 MatrixXd simulateDynamics (VectorXd timeVector, VectorXd initState);
+                MatrixXd simulateDynamics (VectorXd timeVector, VectorXd initState, MatrixXd control);
                 VectorXd integrateRK4 (double time, VectorXd state, VectorXd control, double timeStep);
         };
     }

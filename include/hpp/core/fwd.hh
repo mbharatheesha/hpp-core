@@ -26,6 +26,9 @@
 # include <hpp/util/pointer.hh>
 # include <roboptim/core/function.hh>
 # include <hpp/model/fwd.hh>
+# include <eigen3/Eigen/Core>
+
+using namespace Eigen;
 
 namespace roboptim {
   class StableTimePoint;
@@ -49,6 +52,7 @@ namespace hpp {
     HPP_PREDEF_CLASS (DiscretizedCollisionChecking);
     class Edge;
     HPP_PREDEF_CLASS (ExtractedPath);
+    HPP_PREDEF_CLASS (IntegrateDynamics);
     HPP_PREDEF_CLASS (JointBoundValidation);
     HPP_PREDEF_CLASS (LockedDof);
     class Node;
@@ -65,6 +69,7 @@ namespace hpp {
     HPP_PREDEF_CLASS (SteeringMethod);
     HPP_PREDEF_CLASS (SteeringMethodStraight);
     HPP_PREDEF_CLASS (StraightPath);
+    HPP_PREDEF_CLASS (SystemDynamics);
     HPP_PREDEF_CLASS (WeighedDistance);
     class KDTree;
 
@@ -148,6 +153,10 @@ namespace hpp {
     typedef KDTree* KDTreePtr_t;
     typedef std::map <std::string, DifferentiableFunctionPtr_t>
     DifferentiableFunctionMap_t;
+    typedef boost::shared_ptr <MatrixXd> MatrixPtr_t;
+    typedef boost::shared_ptr <MatrixXd*> MatricesPtr_t;
+    typedef boost::shared_ptr <SystemDynamics> SystemDynamicsPtr_t;
+    typedef boost::shared_ptr <IntegrateDynamics> IntegrateDynamicsPtr_t;
   } // namespace core
 } // namespace hpp
 

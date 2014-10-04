@@ -29,13 +29,12 @@ namespace hpp {
     namespace core {
         class HPP_CORE_DLLAPI SteeringStateSpace {
             protected:
-                VectorXd timeVec_;
                 VectorXd initState_;
                 VectorXd finalState_;
 
             public:
                 // Abstract class for system dynamics
-                virtual VectorXd steerState (VectorXd, VectorXd, VectorXd) = 0;
+                virtual MatrixPtr_t steerState (VectorXd, VectorXd) = 0;
         };
     }
 }

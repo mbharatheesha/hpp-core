@@ -30,14 +30,30 @@ namespace hpp {
         class HPP_CORE_DLLAPI SystemDynamics {
             protected:
                 int nDOF_;
-                VectorXd dynamics_;
-                VectorXd externalforce_;
+                VectorXd dynAutonomous_;
+                VectorXd dynForced_;
                 VectorXd state_;
 
             public:
                 // Abstract class for system dynamics
-                virtual void setProblemDimension (int) = 0;
-                virtual VectorXd computeStateDerivative (double, VectorXd, VectorXd) = 0;
+                virtual void setProblemDimension (int)
+                {
+                }
+                virtual VectorXd computeStateDerivative (
+                        double, VectorXd, VectorXd)
+                {
+                    return VectorXd::Zero (1);
+                }
+                virtual MatrixXd simulateDynamics (VectorXd,
+                        VectorXd)
+                {
+                    return MatrixXd::Zero (1,1);
+                }
+                virtual MatrixXd simulateDynamics (VectorXd,
+                        VectorXd, MatrixXd)
+                {
+                    return MatrixXd::Zero (1,1);
+                }
         };
     }
 }
