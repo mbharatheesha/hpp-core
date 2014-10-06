@@ -102,7 +102,7 @@ namespace hpp {
             for (int i = 1; i < trajLen ; i++)
             {
                 stepSize = tVec (i) - tVec (i-1);
-                VectorXd newState = integrateRK4 (tVec (i-1), stateTraj.col (i-1),
+                VectorXd newState = integrateEuler (tVec (i-1), stateTraj.col (i-1),
                         control.col (i), stepSize);
                 stateTraj.col (i) = newState;
             }
@@ -118,8 +118,10 @@ namespace hpp {
 
             return (state + ((1/6.0) * h * (st1 + 2.0*st2 + 2.0*st3 + st4)));
         }
-
+        VectorXd SimplePendulum::integrateEuler (double t, VectorXd state, VectorXd u, double h)
+        {
+            VectorXd st = computeStateDerivative (t, state, u);
+            return (state + (h * st));
+        }
     }
 }
-
-

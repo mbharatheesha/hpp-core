@@ -28,15 +28,10 @@ using namespace Eigen;
 namespace hpp {
     namespace core {
         class HPP_CORE_DLLAPI IntegrateDynamics {
-            protected:
-                double time_;
-                VectorXd state_;
-                VectorXd control_;
-                VectorXd stepSize_;
-
             public:
                 // Abstract class for system dynamics
                 virtual VectorXd integrateRK4 (double, VectorXd, VectorXd, double) = 0;
+                virtual VectorXd integrateEuler (double, VectorXd, VectorXd, double) = 0;
         };
     }
 }

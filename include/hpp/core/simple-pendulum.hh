@@ -28,7 +28,7 @@
 #define GRAVITY 9.81
 namespace hpp {
     namespace core {
-        class HPP_CORE_DLLAPI SimplePendulum : public SystemDynamics, public IntegrateDynamics {
+        class HPP_CORE_DLLAPI SimplePendulum : public SystemDynamics, protected IntegrateDynamics {
             protected:
                 double length_;
                 double mass_;
@@ -46,6 +46,7 @@ namespace hpp {
                 MatrixXd simulateDynamics (VectorXd timeVector, VectorXd initState);
                 MatrixXd simulateDynamics (VectorXd timeVector, VectorXd initState, MatrixXd control);
                 VectorXd integrateRK4 (double time, VectorXd state, VectorXd control, double timeStep);
+                VectorXd integrateEuler (double time, VectorXd state, VectorXd control, double timeStep);
         };
     }
 }

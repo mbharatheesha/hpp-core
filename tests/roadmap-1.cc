@@ -119,13 +119,14 @@ BOOST_AUTO_TEST_CASE (Roadmap1) {
 
   std::cout << *r << std::endl;
 
-  SystemDynamics* ptr;
+  SystemDynamics* ptr = new SimplePendulum ();
   
-  SimplePendulum pendulum;
-
-  ptr = &pendulum;
+//  SimplePendulum pendulum;
+//
+//  ptr = &pendulum;
 
   SystemDynamicsPtr_t shPtr (ptr);
+
   
   int numDOF = 1;
   VectorXd initState;
@@ -158,11 +159,11 @@ BOOST_AUTO_TEST_CASE (Roadmap1) {
   /// Testing for the ILQR functionality
   SteeringILQR iLQRsteer;
 
-  int ilqrIter = 20;
+  int ilqrIter = 100;
   int numIn = 1;
-  int lenIn = 100;
-  double dt = 0.005;
-  MatrixPtr_t ilqrCtlSeq;
+  int lenIn = 450;
+  double dt = 0.05;
+  MatrixPtr_t statePath;
 
   VectorXd stateWeight (numDOF*2);
   VectorXd finalStateWeight (numDOF*2);
@@ -172,11 +173,6 @@ BOOST_AUTO_TEST_CASE (Roadmap1) {
   finalStateWeight.fill (1);
   controlWeight.fill (1);
 
-  iLQRsteer.setILQRParams (ilqrIter, numIn, lenIn, dt);
-  iLQRsteer.setWeightingMatrices (stateWeight, finalStateWeight, controlWeight);
-  iLQRsteer.setSysDynPtr (shPtr);
-  iLQRsteer.createStCtlShPtr ();
-
   initState (0) = 0;
   initState (1) = 0;
 
@@ -184,7 +180,17 @@ BOOST_AUTO_TEST_CASE (Roadmap1) {
   finalState (0) = 3.1416;
   finalState (1) = 0;
 
-  ilqrCtlSeq = iLQRsteer.steerState (initState, finalState);
+  iLQRsteer.setILQRParams (ilqrIter, numIn, lenIn, dt);
+  iLQRsteer.setWeightingMatrices (stateWeight, finalStateWeight, controlWeight);
+  iLQRsteer.setSysDynPtr (shPtr);
+
+  statePath = iLQRsteer.steerState (initState, finalState);
+  
+  std::ofstream file_path;
+  file_path.open("state_path.dat");  
+
+  file_path << *statePath;
+  file_path.close();
 
   BOOST_CHECK (r->pathExists ());
 }

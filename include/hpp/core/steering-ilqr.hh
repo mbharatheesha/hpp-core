@@ -25,7 +25,7 @@
 # include <hpp/core/system-dynamics.hh>
 # include <hpp/core/steering-statespace.hh>
 
-# define HPP_CORE_FDSTEP_SIZE 1.0e-8
+# define HPP_CORE_FDSTEP_SIZE 1.0e-14
 # define HPP_CORE_FDSTEP_SIZE_INV 1/HPP_CORE_FDSTEP_SIZE
 
 namespace hpp {
@@ -40,9 +40,9 @@ namespace hpp {
                 MatrixXd Qfinal_;
                 MatrixXd Rcontrol_;
                 MatrixPtr_t controlSeq_;
-                MatrixPtr_t dControlSeq_;
+                MatrixXd* dControlSeq_;
                 MatrixPtr_t stateTraj_;
-                MatrixPtr_t dStateTraj_;
+                MatrixXd* dStateTraj_;
                 std::vector<MatrixXd> linMatrices_;
                 SystemDynamicsPtr_t sysDyn_;
 
@@ -60,29 +60,24 @@ namespace hpp {
                 }
                 
                 /// Create Shared pointers for the state and control sequences
-                void createStCtlShPtr ( void )
+                /// Allocate memory sizes for all data
+                void initializeMemory ( void )
                 {
                     MatrixXd* ptrCtl = new MatrixXd (numControl_, controlLen_);
                     MatrixPtr_t shPtrCtl (ptrCtl);
                     controlSeq_ = shPtrCtl;
-                    controlSeq_->setZero (numControl_,controlLen_);
-
-                    MatrixXd* ptrdCtl = new MatrixXd (numControl_, controlLen_);
-                    MatrixPtr_t shPtrdCtl (ptrdCtl);
-                    dControlSeq_ = shPtrdCtl;
-                    dControlSeq_->setZero (numControl_, controlLen_);
 
                     MatrixXd* ptrState = new MatrixXd (initState_.size (), controlLen_);
                     MatrixPtr_t shPtrState (ptrState);
                     stateTraj_ =  shPtrState;
-                    stateTraj_->setZero (initState_.size (), controlLen_);
-                    std::cout << stateTraj_->col (20) << std::endl;
-                    
-                    MatrixXd* ptrdState = new MatrixXd (initState_.size (), controlLen_);
-                    MatrixPtr_t shPtrdState (ptrdState);
-                    dStateTraj_ =  shPtrdState;
-                    dStateTraj_->setZero (initState_.size (), controlLen_);
-                    std::cout << dStateTraj_->col (99) << std::endl;
+
+                    dStateTraj_ = new MatrixXd ();
+                    dStateTraj_->resize (initState_.size (), controlLen_);
+                    dStateTraj_->setZero ();
+
+                    dControlSeq_ = new MatrixXd ();
+                    dControlSeq_->resize (numControl_, controlLen_);
+                    dControlSeq_->setZero ();
                 } 
 
 
@@ -105,7 +100,7 @@ namespace hpp {
                 void linearizeFDJacobian (VectorXd, VectorXd, MatrixXd&);
 
                 /// Find optimal control improvement by iteratively solving LQR
-                MatrixPtr_t deltaOptControl ();
+                MatrixXd* deltaOptControl ();
 
                 /// Steer from initial state to final state
                 MatrixPtr_t steerState (VectorXd, VectorXd);

@@ -36,24 +36,13 @@ namespace hpp {
 
             public:
                 // Abstract class for system dynamics
-                virtual void setProblemDimension (int)
-                {
-                }
+                virtual void setProblemDimension (int) = 0;
                 virtual VectorXd computeStateDerivative (
-                        double, VectorXd, VectorXd)
-                {
-                    return VectorXd::Zero (1);
-                }
-                virtual MatrixXd simulateDynamics (VectorXd,
-                        VectorXd)
-                {
-                    return MatrixXd::Zero (1,1);
-                }
-                virtual MatrixXd simulateDynamics (VectorXd,
-                        VectorXd, MatrixXd)
-                {
-                    return MatrixXd::Zero (1,1);
-                }
+                        double time, const VectorXd& state, const VectorXd& control) = 0;
+                virtual MatrixXd simulateDynamics (const VectorXd& timeVec,
+                        const VectorXd& initState) = 0;
+                virtual MatrixXd simulateDynamics (const VectorXd& timeVec,
+                        const VectorXd& initState, const MatrixXd& controlFeedFwd) = 0;
         };
     }
 }
