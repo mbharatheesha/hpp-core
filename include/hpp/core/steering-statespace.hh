@@ -34,7 +34,7 @@ namespace hpp {
 
             public:
                 // Abstract class for system dynamics
-                virtual MatrixPtr_t steerState (VectorXd, VectorXd) = 0;
+                virtual MatrixPtr_t steerState (vectorIn_t, vectorIn_t) = 0;
         };
     }
 }

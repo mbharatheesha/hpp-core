@@ -30,8 +30,8 @@ namespace hpp {
         class HPP_CORE_DLLAPI IntegrateDynamics {
             public:
                 // Abstract class for system dynamics
-                virtual VectorXd integrateRK4 (double, VectorXd, VectorXd, double) = 0;
-                virtual VectorXd integrateEuler (double, VectorXd, VectorXd, double) = 0;
+                virtual vectorOut_t integrateRK4 (double, vectorIn_t, vectorIn_t, double) = 0;
+                virtual vectorOut_t integrateEuler (double, vectorIn_t, vectorIn_t, double) = 0;
         };
     }
 }

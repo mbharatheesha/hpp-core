@@ -28,7 +28,7 @@
 #define GRAVITY 9.81
 namespace hpp {
     namespace core {
-        class HPP_CORE_DLLAPI SimplePendulum : public SystemDynamics, protected IntegrateDynamics {
+        class HPP_CORE_DLLAPI SimplePendulum : public SystemDynamics, public IntegrateDynamics {
             protected:
                 double length_;
                 double mass_;
@@ -41,12 +41,12 @@ namespace hpp {
                 // Abstract class for system dynamics
                 void setProblemDimension (int n);
                 void setParameters (void);
-                VectorXd computeStateDerivative (double time, VectorXd stateVector, VectorXd control);
-                VectorXd getControl (VectorXd stateVector);
-                MatrixXd simulateDynamics (VectorXd timeVector, VectorXd initState);
-                MatrixXd simulateDynamics (VectorXd timeVector, VectorXd initState, MatrixXd control);
-                VectorXd integrateRK4 (double time, VectorXd state, VectorXd control, double timeStep);
-                VectorXd integrateEuler (double time, VectorXd state, VectorXd control, double timeStep);
+                vectorOut_t computeStateDerivative (double time, vectorIn_t stateVector, vectorIn_t control);
+                vectorOut_t getControl (vectorIn_t stateVector);
+                matrixOut_t simulateDynamics (vectorIn_t timeVector, vectorIn_t initState);
+                matrixOut_t simulateDynamics (vectorIn_t timeVector, vectorIn_t initState, matrixIn_t control);
+                vectorOut_t integrateRK4 (double time, vectorIn_t state, vectorIn_t control, double timeStep);
+                vectorOut_t integrateEuler (double time, vectorIn_t state, vectorIn_t control, double timeStep);
         };
     }
 }

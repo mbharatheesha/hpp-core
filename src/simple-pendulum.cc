@@ -32,8 +32,8 @@ namespace hpp {
             mass_ = 1.0;   // kg
             friction_ = 0.1; // kg/s
         }
-        VectorXd SimplePendulum::computeStateDerivative
-            (double time, VectorXd stateVector, VectorXd control)
+        vectorOut_t SimplePendulum::computeStateDerivative
+            (double time, vectorIn_t stateVector, vectorIn_t control)
             {
                 VectorXd stateDot (stateVector.size ());
 
@@ -51,7 +51,7 @@ namespace hpp {
 
                 return stateDot;
             }
-        VectorXd SimplePendulum::getControl (VectorXd stateVector)
+        vectorOut_t SimplePendulum::getControl (vectorIn_t stateVector)
         {
             VectorXd control;
 
@@ -63,8 +63,9 @@ namespace hpp {
         }
 
         /// Used for feedback control
-        MatrixXd SimplePendulum::simulateDynamics (VectorXd tVec,
-                VectorXd initState)
+        matrixOut_t SimplePendulum::simulateDynamics (vectorIn_t tVec,
+
+                vectorIn_t initState)
         {
             int trajLen = tVec.size();
             MatrixXd stateTraj;
@@ -87,8 +88,8 @@ namespace hpp {
         }
 
         /// Used for feedforward control
-        MatrixXd SimplePendulum::simulateDynamics (VectorXd tVec,
-                VectorXd initState, MatrixXd control)
+        matrixOut_t SimplePendulum::simulateDynamics (vectorIn_t tVec,
+                vectorIn_t initState, matrixIn_t control)
         {
             int trajLen = tVec.size();
             MatrixXd stateTraj;
@@ -109,19 +110,24 @@ namespace hpp {
 
             return stateTraj;
         }
-        VectorXd SimplePendulum::integrateRK4 (double t, VectorXd state, VectorXd u, double h)
+        
+        vectorOut_t SimplePendulum::integrateRK4 (double t, vectorIn_t state, vectorIn_t u, double h)
         {
             VectorXd st1 = computeStateDerivative (t, state, u);
             VectorXd st2 = computeStateDerivative (t + (0.5 * h), state + (0.5 * h * st1), u);
             VectorXd st3 = computeStateDerivative (t + (0.5 * h), state + (0.5 * h * st2),  u);
             VectorXd st4 = computeStateDerivative (t + h, state + (h * st3), u);
 
-            return (state + ((1/6.0) * h * (st1 + 2.0*st2 + 2.0*st3 + st4)));
+            VectorXd stNew = state + ((1/6.0) * h * (st1 + 2.0*st2 + 2.0*st3 + st4));
+
+            return (stNew);
         }
-        VectorXd SimplePendulum::integrateEuler (double t, VectorXd state, VectorXd u, double h)
+        
+        vectorOut_t SimplePendulum::integrateEuler (double t, vectorIn_t state, vectorIn_t u, double h)
         {
             VectorXd st = computeStateDerivative (t, state, u);
-            return (state + (h * st));
+            VectorXd stNew = state + h*st;
+            return (stNew);
         }
     }
 }

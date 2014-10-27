@@ -31,8 +31,8 @@ namespace hpp {
             DT_ = dt;
         }
         /// Set the weighting matrices for computing cost
-        void SteeringILQR::setWeightingMatrices (VectorXd stateWeights, VectorXd finalStateWeights,
-                VectorXd controlWeights)
+        void SteeringILQR::setWeightingMatrices (vectorIn_t stateWeights, vectorIn_t finalStateWeights,
+                vectorIn_t controlWeights)
         {
             Qstate_ = stateWeights.asDiagonal ();
             Qfinal_ = finalStateWeights.asDiagonal ();
@@ -48,7 +48,8 @@ namespace hpp {
 
             for (int i=0; i < stateTraj_->cols () - 1; i++)
             {
-                costTraj += ((stateTraj_->col (i) - finalState_).transpose () * Qstate_ * (stateTraj_->col (i) - finalState_)) +
+                costTraj = costTraj + 
+                    ((stateTraj_->col (i)-finalState_ ).transpose () * Qstate_ * (stateTraj_->col (i)-finalState_ )) +
                     (controlSeq_->col (i).transpose () * Rcontrol_ * controlSeq_->col (i));
             }
 
@@ -67,15 +68,15 @@ namespace hpp {
         {
             for (int i = 0; i < stateTraj_->cols (); i++)
             {
+                linMatrices_[i].resize (stateTraj_->rows (), controlSeq_->rows () + stateTraj_->rows ());
                 linearizeFDJacobian (stateTraj_->col (i), controlSeq_->col (i), linMatrices_.at (i));
             }
         }
 
         /// Forward Finite Difference Linearization
-        void SteeringILQR::linearizeFDJacobian (VectorXd state, VectorXd control,
-                MatrixXd& lMat)
+        void SteeringILQR::linearizeFDJacobian (vectorIn_t state, vectorIn_t control,
+                matrixOut_t lMat)
         {
-            lMat.resize (state.rows (), state.rows () + control.rows ());
             int idxState;
             MatrixXd discreteIdentity (MatrixXd::Identity (state.rows (), state.rows ()));
 
@@ -112,20 +113,15 @@ namespace hpp {
         {
             MatrixXd Alin; 
             MatrixXd Blin;
-            MatrixXd commonTerm2;
+
             Alin = (linMatrices_.at (controlLen_-1)).leftCols (initState_.size ());
-            Blin = (linMatrices_.at (controlLen_-1)).rightCols (numControl);
+            Blin = (linMatrices_.at (controlLen_-1)).rightCols (numControl_);
             MatrixXd Snext = Qfinal_;
-            MatrixXd valFun = MatrixXd::Zero (initState_.size (), controlLen_);
 
-            valFun.col (controlLen_-1) = Snext *
+            valFun_.col (controlLen_-1) = Snext *
                 (stateTraj_->col (controlLen_-1) - finalState_);
-            commonTerm2 = Blin * Rcontrol_.inverse () * Blin.transpose ();
-            MatrixXd dStateNext = (MatrixXd::Identity (initState_.size (), initState_.size ()) + 
-                    ( commonTerm2 * Snext).inverse ()) *
-                ((Alin * (*dStateTraj_) - commonTerm2 * valFun - Blin * (*controlSeq_));
 
-            VectorXd valNext = valFun.col (controlLen_-1);
+            VectorXd valNext = valFun_.col (controlLen_-1);
 
             MatrixXd K = MatrixXd::Zero (numControl_, initState_.size ());
             MatrixXd Kv = MatrixXd::Zero (numControl_, initState_.size ());
@@ -133,6 +129,7 @@ namespace hpp {
             MatrixXd commonTerm;
             MatrixXd Snew;
             MatrixXd closedLoopDyn;
+
             for (int i = controlLen_-2; i >= 0; i--)
             {
                 Alin = (linMatrices_.at (i)).leftCols (initState_.size ());
@@ -142,7 +139,6 @@ namespace hpp {
 
                 K = commonTerm * Blin.transpose () * Snext * Alin;
 
-
                 Kv = commonTerm * Blin.transpose ();
 
                 Ku = commonTerm * Rcontrol_;
@@ -151,26 +147,27 @@ namespace hpp {
 
                 Snew = Alin.transpose () * Snext * closedLoopDyn + Qstate_;
 
-                valFun.col (i) = closedLoopDyn.transpose () * valNext -
+                valFun_.col (i) = closedLoopDyn.transpose () * valNext -
                         (K.transpose () * Rcontrol_ * controlSeq_->col (i)) +
                         (Qstate_ * stateTraj_->col (i));
 
                 dControlSeq_->col (i) =- ((K * dStateTraj_->col (i)) + (Kv * valNext) +
                         (Ku * controlSeq_->col (i)));
                 
-
-                valNext = valFun.col(i);
+                valNext = valFun_.col(i);
                 Snext = Snew;
             }
 
             return dControlSeq_;
         }
 
-        MatrixPtr_t SteeringILQR::steerState (VectorXd init, VectorXd final)
+        MatrixPtr_t SteeringILQR::steerState (vectorIn_t init, vectorIn_t final)
         {
             initState_ = init;
             finalState_ = final;
             std::vector <double> costVec (numIter_);
+            std::ofstream file1;
+            file1.open ("control_profile.dat");
 
             initializeMemory ();
 
@@ -189,6 +186,7 @@ namespace hpp {
 
                 *controlSeq_ = *controlSeq_ + (0.25 * (*dControlSeq_));
                 forwardPass (controlSeq_);
+
                 costVec.at (i) = computeCost ();
 
                 curCost = costVec.at (i);
@@ -196,10 +194,7 @@ namespace hpp {
                 std::cout << curCost << std::endl;
             }
 
-            std::ofstream file1;
-            file1.open ("control_profile.dat");
-
-            file1 << *controlSeq_;
+            file1 << *controlSeq_ << std::endl;
             file1.close ();
             
             std::cout << "ILQR control computed successfully!" << std::endl;

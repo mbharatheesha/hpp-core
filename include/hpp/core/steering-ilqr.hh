@@ -25,7 +25,7 @@
 # include <hpp/core/system-dynamics.hh>
 # include <hpp/core/steering-statespace.hh>
 
-# define HPP_CORE_FDSTEP_SIZE 1.0e-14
+# define HPP_CORE_FDSTEP_SIZE 1.0e-17
 # define HPP_CORE_FDSTEP_SIZE_INV 1/HPP_CORE_FDSTEP_SIZE
 
 namespace hpp {
@@ -39,6 +39,7 @@ namespace hpp {
                 MatrixXd Qstate_;
                 MatrixXd Qfinal_;
                 MatrixXd Rcontrol_;
+                MatrixXd valFun_;
                 MatrixPtr_t controlSeq_;
                 MatrixXd* dControlSeq_;
                 MatrixPtr_t stateTraj_;
@@ -49,7 +50,7 @@ namespace hpp {
             public:
                 /// Constructor
                 SteeringILQR () : SteeringStateSpace (), numIter_ (20), numControl_ (1),
-                controlLen_ (100), DT_ (0.005), Qstate_ (), Qfinal_ (), Rcontrol_ (),
+                controlLen_ (100), DT_ (0.005), Qstate_ (), Qfinal_ (), Rcontrol_ (), valFun_ (),
                 linMatrices_ (), sysDyn_ ()
             {
             }
@@ -77,7 +78,9 @@ namespace hpp {
 
                     dControlSeq_ = new MatrixXd ();
                     dControlSeq_->resize (numControl_, controlLen_);
-                    dControlSeq_->setZero ();
+                    dControlSeq_->setConstant (1.0e-6);
+
+                    valFun_ = MatrixXd::Zero (initState_.size (), controlLen_);
                 } 
 
 
@@ -85,7 +88,7 @@ namespace hpp {
                 void setILQRParams (int, int, int, double);
                 
                 /// Set the weighting matrices for computing cost
-                void setWeightingMatrices (VectorXd, VectorXd, VectorXd);
+                void setWeightingMatrices (vectorIn_t, vectorIn_t, vectorIn_t);
                 
                 /// Cost Function
                 double computeCost ();
@@ -97,13 +100,13 @@ namespace hpp {
                 void linearizeSystem ();
 
                 /// Forward Finite Difference Linearization
-                void linearizeFDJacobian (VectorXd, VectorXd, MatrixXd&);
+                void linearizeFDJacobian (vectorIn_t, vectorIn_t, matrixOut_t);
 
                 /// Find optimal control improvement by iteratively solving LQR
                 MatrixXd* deltaOptControl ();
 
                 /// Steer from initial state to final state
-                MatrixPtr_t steerState (VectorXd, VectorXd);
+                MatrixPtr_t steerState (vectorIn_t, vectorIn_t);
         };
     }
 

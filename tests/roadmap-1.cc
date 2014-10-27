@@ -159,7 +159,7 @@ BOOST_AUTO_TEST_CASE (Roadmap1) {
   /// Testing for the ILQR functionality
   SteeringILQR iLQRsteer;
 
-  int ilqrIter = 100;
+  int ilqrIter = 40;
   int numIn = 1;
   int lenIn = 450;
   double dt = 0.05;
